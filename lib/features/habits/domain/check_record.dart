@@ -6,6 +6,7 @@ class CheckRecord {
   final String? note;
   final int? mood;
   final int focusMinutes;
+  final String? imagePath;
 
   CheckRecord({
     required this.id,
@@ -15,6 +16,7 @@ class CheckRecord {
     this.note,
     this.mood,
     this.focusMinutes = 0,
+    this.imagePath,
   });
 
   Map<String, dynamic> toMap() {
@@ -26,6 +28,7 @@ class CheckRecord {
       'note': note,
       'mood': mood,
       'focus_minutes': focusMinutes,
+      'image_path': imagePath,
     };
   }
 
@@ -38,6 +41,7 @@ class CheckRecord {
       note: map['note'] as String?,
       mood: map['mood'] as int?,
       focusMinutes: map['focus_minutes'] as int? ?? 0,
+      imagePath: map['image_path'] as String?,
     );
   }
 
@@ -49,6 +53,7 @@ class CheckRecord {
     String? note,
     int? mood,
     int? focusMinutes,
+    String? imagePath,
   }) {
     return CheckRecord(
       id: id ?? this.id,
@@ -58,6 +63,7 @@ class CheckRecord {
       note: note ?? this.note,
       mood: mood ?? this.mood,
       focusMinutes: focusMinutes ?? this.focusMinutes,
+      imagePath: imagePath ?? this.imagePath,
     );
   }
 }

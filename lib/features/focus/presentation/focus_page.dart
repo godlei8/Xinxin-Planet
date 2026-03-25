@@ -3,10 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/config/feature_flags.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../services/providers.dart';
 import '../../../services/notification_service.dart';
+import '../domain/focus_forest_entry.dart';
 
 enum FocusTimerState { idle, running, paused, finished }
 
@@ -52,9 +55,19 @@ class FocusTimerData {
 }
 
 class FocusTimerNotifier extends StateNotifier<FocusTimerData> {
-  FocusTimerNotifier() : super(const FocusTimerData());
+  FocusTimerNotifier({
+    required Future<void> Function({
+      required int durationSec,
+      required bool isAlive,
+    }) onSessionPersist,
+  })  : _onSessionPersist = onSessionPersist,
+        super(const FocusTimerData());
 
   Timer? _timer;
+  final Future<void> Function({
+    required int durationSec,
+    required bool isAlive,
+  }) _onSessionPersist;
 
   void setDuration(int minutes) {
     if (state.state != FocusTimerState.idle) {
@@ -88,9 +101,13 @@ class FocusTimerNotifier extends StateNotifier<FocusTimerData> {
       final next = state.remainingDuration - const Duration(seconds: 1);
       if (next.inSeconds <= 0) {
         _timer?.cancel();
+        final completedDuration = state.totalDuration.inSeconds;
         state = state.copyWith(
           state: FocusTimerState.finished,
           remainingDuration: Duration.zero,
+        );
+        unawaited(
+          _onSessionPersist(durationSec: completedDuration, isAlive: true),
         );
         unawaited(_notifyComplete());
         return;
@@ -115,6 +132,11 @@ class FocusTimerNotifier extends StateNotifier<FocusTimerData> {
   }
 
   void stop() {
+    final wasRunningOrPaused = state.state == FocusTimerState.running ||
+        state.state == FocusTimerState.paused;
+    final elapsedSec =
+        state.totalDuration.inSeconds - state.remainingDuration.inSeconds;
+
     _timer?.cancel();
     final duration = Duration(minutes: state.selectedMinutes);
     state = FocusTimerData(
@@ -122,6 +144,10 @@ class FocusTimerNotifier extends StateNotifier<FocusTimerData> {
       remainingDuration: duration,
       selectedMinutes: state.selectedMinutes,
     );
+
+    if (wasRunningOrPaused && elapsedSec > 0) {
+      unawaited(_onSessionPersist(durationSec: elapsedSec, isAlive: false));
+    }
   }
 
   void reset() {
@@ -145,7 +171,17 @@ class FocusTimerNotifier extends StateNotifier<FocusTimerData> {
 
 final focusTimerProvider =
     StateNotifierProvider<FocusTimerNotifier, FocusTimerData>((ref) {
-  return FocusTimerNotifier();
+  return FocusTimerNotifier(
+    onSessionPersist: ({required durationSec, required isAlive}) async {
+      if (!FeatureFlags.enableFocusForest) {
+        return;
+      }
+      await ref.read(focusForestProvider.notifier).addSession(
+            durationSec: durationSec,
+            isAlive: isAlive,
+          );
+    },
+  );
 });
 
 class FocusPage extends ConsumerWidget {
@@ -155,6 +191,11 @@ class FocusPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final timer = ref.watch(focusTimerProvider);
     final notifier = ref.read(focusTimerProvider.notifier);
+    final forestAsync = FeatureFlags.enableFocusForest
+        ? ref.watch(focusForestProvider)
+        : const AsyncValue<List<FocusForestEntry>>.data(
+            <FocusForestEntry>[],
+          );
     final screenSize = MediaQuery.sizeOf(context);
     final compact = screenSize.height < 760;
     final heroPadding = compact ? 18.0 : 24.0;
@@ -251,6 +292,10 @@ class FocusPage extends ConsumerWidget {
               ),
             ),
             SizedBox(height: sectionSpacing),
+            if (FeatureFlags.enableFocusForest) ...[
+              _FocusForestPanel(forestAsync: forestAsync),
+              SizedBox(height: sectionSpacing),
+            ],
             Card(
               child: Padding(
                 padding: EdgeInsets.all(cardPadding),
@@ -412,5 +457,186 @@ class FocusPage extends ConsumerWidget {
       case FocusTimerState.finished:
         return '做得很好';
     }
+  }
+}
+
+class _FocusForestPanel extends StatelessWidget {
+  const _FocusForestPanel({
+    required this.forestAsync,
+  });
+
+  final AsyncValue<List<FocusForestEntry>> forestAsync;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: forestAsync.when(
+          data: (entries) {
+            final aliveCount = entries.where((item) => item.isAlive).length;
+            final totalDurationMin = entries.fold<int>(
+              0,
+              (sum, item) => sum + (item.durationSec ~/ 60),
+            );
+            final recent = entries.take(14).toList(growable: false);
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '专注森林',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '专注完成会长成树苗，中途退出会留下枯枝。',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    _ForestStatChip(
+                      icon: Icons.park_rounded,
+                      label: '存活 $aliveCount 棵',
+                    ),
+                    const SizedBox(width: 8),
+                    _ForestStatChip(
+                      icon: Icons.schedule_rounded,
+                      label: '累计 $totalDurationMin 分钟',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (recent.isEmpty)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .primary
+                          .withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Text(
+                      '开始第一轮专注后，这里会出现你的第一棵树。',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  )
+                else
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: recent
+                        .map((entry) => _ForestTreeChip(entry: entry))
+                        .toList(),
+                  ),
+              ],
+            );
+          },
+          loading: () => const SizedBox(
+            height: 90,
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (_, __) => const SizedBox.shrink(),
+        ),
+      ),
+    );
+  }
+}
+
+class _ForestStatChip extends StatelessWidget {
+  const _ForestStatChip({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ForestTreeChip extends StatelessWidget {
+  const _ForestTreeChip({
+    required this.entry,
+  });
+
+  final FocusForestEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final isAlive = entry.isAlive;
+    final icon = _treeIcon(entry.treeType, entry.treeSize, isAlive);
+    final minText = '${(entry.durationSec / 60).ceil()} 分钟';
+
+    return Container(
+      width: 78,
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+      decoration: BoxDecoration(
+        color: isAlive
+            ? const Color(0xFFE8F8EC)
+            : Theme.of(context).colorScheme.surface.withValues(alpha: 0.8),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isAlive ? const Color(0xFFD0F0D9) : const Color(0xFFE4DEE8),
+        ),
+      ),
+      child: Column(
+        children: [
+          Text(icon, style: const TextStyle(fontSize: 22)),
+          const SizedBox(height: 4),
+          Text(
+            minText,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _treeIcon(String type, String size, bool isAlive) {
+    if (!isAlive) {
+      return '🥀';
+    }
+
+    if (type == 'golden' || size == 'ancient') {
+      return '🌲';
+    }
+    if (type == 'pine' || size == 'tree') {
+      return '🌳';
+    }
+    if (type == 'oak' || size == 'sapling') {
+      return '🌿';
+    }
+    return '🌱';
   }
 }

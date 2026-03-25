@@ -6,7 +6,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'core/constants/app_colors.dart';
 import 'core/constants/app_strings.dart';
 import 'core/theme/app_theme.dart';
-import 'core/widgets/interactive_pet_companion.dart';
 import 'routes/main_navigation.dart';
 import 'services/notification_service.dart';
 import 'services/providers.dart';
@@ -23,15 +22,12 @@ Future<void> main() async {
   final prefs = await SharedPreferences.getInstance();
   final themeColorIndex = prefs.getInt('theme_color_index') ?? 0;
   final isDarkMode = prefs.getBool('dark_mode') ?? false;
-  final petType =
-      PetTypeX.fromId(prefs.getString('pet_type') ?? PetType.bunny.id);
 
   runApp(
     ProviderScope(
       overrides: [
         themeColorIndexProvider.overrideWith((ref) => themeColorIndex),
         isDarkModeProvider.overrideWith((ref) => isDarkMode),
-        petTypeProvider.overrideWith((ref) => petType),
       ],
       child: const XinxinPlanetApp(),
     ),

@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/config/feature_flags.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/utils/date_utils.dart' as app_date;
 import '../../../services/providers.dart';
+import '../../habits/domain/achievement.dart';
 import '../../habits/domain/check_record.dart';
 import '../../habits/domain/habit.dart';
 
@@ -29,87 +31,144 @@ class HabitCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final habitColor = AppColors.fromHex(habit.colorCode);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Card(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Row(
-            children: [
-              Container(
-                width: 58,
-                height: 58,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      habitColor.withValues(alpha: 0.92),
-                      habitColor.withValues(alpha: 0.68),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Center(
-                  child: Text(
-                    habit.iconCode,
-                    style: const TextStyle(fontSize: 28),
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      habit.name,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.28)
+                : habitColor.withValues(alpha: 0.16),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(28),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(28),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        habitColor.withValues(alpha: 0.9),
+                        habitColor.withValues(alpha: 0.66),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                    if (habit.description.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        habit.description,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyMedium,
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                  child: Center(
+                    child: Text(
+                      habit.iconCode,
+                      style: const TextStyle(fontSize: 30),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              habit.name,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w800),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          _StatusBadge(isCheckedIn: isCheckedIn),
+                        ],
                       ),
-                    ],
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _MiniTag(
-                          icon: '🔥',
-                          label: '$currentStreak 天连胜',
-                          color: Colors.orange,
-                        ),
-                        _MiniTag(
-                          icon: habit.reminderEnabled ? '⏰' : '🌼',
-                          label: habit.reminderEnabled
-                              ? (habit.reminderTime ?? '已提醒')
-                              : '随时完成',
-                          color: habitColor,
+                      if (habit.description.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          habit.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(height: 1.35),
                         ),
                       ],
-                    ),
-                  ],
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _MiniTag(
+                            icon: '🔥',
+                            label: '$currentStreak 天连胜',
+                            color: const Color(0xFFFFA54C),
+                          ),
+                          _MiniTag(
+                            icon: habit.reminderEnabled ? '⏰' : '🌈',
+                            label: habit.reminderEnabled
+                                ? (habit.reminderTime ?? '已提醒')
+                                : '随时完成',
+                            color: habitColor,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              _CheckButton(
-                habitColor: habitColor,
-                isCheckedIn: isCheckedIn,
-                onTap: isCheckedIn ? null : onCheckIn,
-              ),
-            ],
+                const SizedBox(width: AppSpacing.md),
+                _CheckButton(
+                  habitColor: habitColor,
+                  isCheckedIn: isCheckedIn,
+                  onTap: isCheckedIn ? null : onCheckIn,
+                ),
+              ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({required this.isCheckedIn});
+
+  final bool isCheckedIn;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = isCheckedIn ? const Color(0xFFE4FAEF) : const Color(0xFFFFF0F8);
+    final fg = isCheckedIn ? const Color(0xFF2A8D64) : const Color(0xFFAF4B80);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        isCheckedIn ? '今日已完成' : '待打卡',
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: fg,
+              fontWeight: FontWeight.w800,
+            ),
       ),
     );
   }
@@ -165,41 +224,47 @@ class _CheckButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        width: 70,
-        height: 70,
-        decoration: BoxDecoration(
-          color: isCheckedIn ? AppColors.successColor : habitColor,
-          borderRadius: BorderRadius.circular(22),
-          boxShadow: [
-            BoxShadow(
-              color: (isCheckedIn ? AppColors.successColor : habitColor)
-                  .withValues(alpha: 0.28),
-              blurRadius: 16,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isCheckedIn ? Icons.check_rounded : Icons.add_rounded,
-              color: Colors.white,
-              size: 28,
-            ),
-            const SizedBox(height: 2),
-            Text(
-              isCheckedIn ? '已完成' : AppStrings.checkIn,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                  ),
-            ),
-          ],
+    final buttonColor = isCheckedIn ? AppColors.successColor : habitColor;
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          width: 68,
+          height: 68,
+          decoration: BoxDecoration(
+            color: buttonColor,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: buttonColor.withValues(alpha: 0.3),
+                blurRadius: 14,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                isCheckedIn ? Icons.check_rounded : Icons.add_rounded,
+                color: Colors.white,
+                size: 26,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                isCheckedIn ? '完成' : AppStrings.checkIn,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -235,7 +300,7 @@ class _CheckInBottomSheetState extends ConsumerState<CheckInBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final habitColor = AppColors.fromHex(widget.habit.colorCode);
-    final surfaceColor = Theme.of(context).colorScheme.surface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       padding: EdgeInsets.only(
@@ -245,8 +310,11 @@ class _CheckInBottomSheetState extends ConsumerState<CheckInBottomSheet> {
         bottom: MediaQuery.of(context).viewInsets.bottom + 20,
       ),
       decoration: BoxDecoration(
-        color: surfaceColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        border: Border.all(
+          color: isDark ? const Color(0xFF3A3142) : const Color(0xFFFFDDF0),
+        ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -254,7 +322,7 @@ class _CheckInBottomSheetState extends ConsumerState<CheckInBottomSheet> {
         children: [
           Center(
             child: Container(
-              width: 42,
+              width: 46,
               height: 4,
               decoration: BoxDecoration(
                 color: AppColors.lightGrey,
@@ -266,15 +334,21 @@ class _CheckInBottomSheetState extends ConsumerState<CheckInBottomSheet> {
           Row(
             children: [
               Container(
-                width: 52,
-                height: 52,
+                width: 54,
+                height: 54,
                 decoration: BoxDecoration(
-                  color: habitColor.withValues(alpha: 0.14),
+                  gradient: LinearGradient(
+                    colors: [
+                      habitColor.withValues(alpha: 0.9),
+                      habitColor.withValues(alpha: 0.64),
+                    ],
+                  ),
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: Center(
-                    child: Text(widget.habit.iconCode,
-                        style: const TextStyle(fontSize: 28))),
+                  child: Text(widget.habit.iconCode,
+                      style: const TextStyle(fontSize: 28)),
+                ),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -283,7 +357,10 @@ class _CheckInBottomSheetState extends ConsumerState<CheckInBottomSheet> {
                   children: [
                     Text(
                       widget.habit.name,
-                      style: Theme.of(context).textTheme.titleLarge,
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(fontWeight: FontWeight.w900),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -298,57 +375,66 @@ class _CheckInBottomSheetState extends ConsumerState<CheckInBottomSheet> {
           const SizedBox(height: AppSpacing.xl),
           Text('现在的心情', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: AppSpacing.sm),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(AppStrings.moodEmojis.length, (index) {
-              final isSelected = _selectedMood == index;
-              return GestureDetector(
-                onTap: () => setState(() => _selectedMood = index),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  width: 60,
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? habitColor.withValues(alpha: 0.14)
-                        : AppColors.lightGrey,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: isSelected ? habitColor : Colors.transparent,
-                      width: 1.6,
-                    ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: List.generate(AppStrings.moodEmojis.length, (index) {
+                final isSelected = _selectedMood == index;
+                return Padding(
+                  padding: EdgeInsets.only(
+                    right: index == AppStrings.moodEmojis.length - 1 ? 0 : 8,
                   ),
-                  child: Column(
-                    children: [
-                      Text(AppStrings.moodEmojis[index],
-                          style: const TextStyle(fontSize: 26)),
-                      const SizedBox(height: 4),
-                      Text(
-                        AppStrings.moodLabels[index],
-                        textAlign: TextAlign.center,
-                        style:
-                            Theme.of(context).textTheme.labelMedium?.copyWith(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _selectedMood = index),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      width: 64,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? habitColor.withValues(alpha: 0.14)
+                            : AppColors.lightGrey,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: isSelected ? habitColor : Colors.transparent,
+                          width: 1.6,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(AppStrings.moodEmojis[index],
+                              style: const TextStyle(fontSize: 26)),
+                          const SizedBox(height: 4),
+                          Text(
+                            AppStrings.moodLabels[index],
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelMedium
+                                ?.copyWith(
                                   color: isSelected
                                       ? habitColor
                                       : AppColors.textSecondary,
                                 ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
-              );
-            }),
+                );
+              }),
+            ),
           ),
           const SizedBox(height: AppSpacing.xl),
           Text('专注时长（分钟）', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: AppSpacing.sm),
           Row(
             children: [
-              OutlinedButton(
-                onPressed: _focusMinutes > 0
+              _CircleIconButton(
+                icon: Icons.remove_rounded,
+                onTap: _focusMinutes > 0
                     ? () => setState(() => _focusMinutes -= 5)
                     : null,
-                child: const Icon(Icons.remove_rounded),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -369,9 +455,9 @@ class _CheckInBottomSheetState extends ConsumerState<CheckInBottomSheet> {
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
-              OutlinedButton(
-                onPressed: () => setState(() => _focusMinutes += 5),
-                child: const Icon(Icons.add_rounded),
+              _CircleIconButton(
+                icon: Icons.add_rounded,
+                onTap: () => setState(() => _focusMinutes += 5),
               ),
             ],
           ),
@@ -428,13 +514,21 @@ class _CheckInBottomSheetState extends ConsumerState<CheckInBottomSheet> {
           return;
         }
         messenger.showSnackBar(
-            const SnackBar(content: Text(AppStrings.checkInAgain)));
+          const SnackBar(content: Text(AppStrings.checkInAgain)),
+        );
         return;
       }
 
       await ref
           .read(userProgressProvider.notifier)
           .recordCheckIn(widget.habit.id);
+      var unlocked = <Achievement>[];
+      if (FeatureFlags.enableAchievementSystem) {
+        unlocked =
+            await ref.read(achievementServiceProvider).evaluateAndUnlock();
+        ref.invalidate(achievementsProvider);
+        ref.invalidate(achievementProgressProvider);
+      }
 
       if (!mounted) {
         return;
@@ -442,7 +536,14 @@ class _CheckInBottomSheetState extends ConsumerState<CheckInBottomSheet> {
       navigator.pop();
       widget.onCheckInComplete();
       messenger.showSnackBar(
-          const SnackBar(content: Text(AppStrings.checkInSuccess)));
+        SnackBar(
+          content: Text(
+            unlocked.isEmpty
+                ? AppStrings.checkInSuccess
+                : '${AppStrings.checkInSuccess}，解锁成就：${unlocked.first.name}',
+          ),
+        ),
+      );
     } catch (error) {
       if (!mounted) {
         return;
@@ -453,5 +554,37 @@ class _CheckInBottomSheetState extends ConsumerState<CheckInBottomSheet> {
         setState(() => _isSaving = false);
       }
     }
+  }
+}
+
+class _CircleIconButton extends StatelessWidget {
+  const _CircleIconButton({
+    required this.icon,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+
+    return Material(
+      color: enabled ? const Color(0xFFFFECF7) : const Color(0xFFF3EEF5),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: SizedBox(
+          width: 44,
+          height: 44,
+          child: Icon(
+            icon,
+            color: enabled ? const Color(0xFFAA4A80) : const Color(0xFFBDB7C7),
+          ),
+        ),
+      ),
+    );
   }
 }

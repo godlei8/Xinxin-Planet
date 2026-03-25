@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class DailyQuote {
   const DailyQuote({
@@ -38,6 +39,8 @@ class DailyQuoteService {
   final http.Client _client;
 
   static const _endpoint = 'https://open.iciba.com/dsapi';
+  static const _cacheDateKey = 'daily_quote_cache_date';
+  static const _cachePayloadKey = 'daily_quote_cache_payload';
 
   static const _fallbackQuote = DailyQuote(
     english: 'Tiny progress still counts today.',
@@ -49,6 +52,12 @@ class DailyQuoteService {
   );
 
   Future<DailyQuote> fetchTodayQuote() async {
+    final today = DateTime.now().toIso8601String().split('T').first;
+    final cachedQuote = await _readCache(today);
+    if (cachedQuote != null) {
+      return cachedQuote;
+    }
+
     try {
       final uri = Uri.parse(_endpoint).replace(
         queryParameters: {
@@ -71,9 +80,49 @@ class DailyQuoteService {
         return _fallbackQuote;
       }
 
+      await _writeCache(today, quote);
       return quote;
     } catch (_) {
       return _fallbackQuote;
+    }
+  }
+
+  Future<DailyQuote?> _readCache(String today) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cacheDate = prefs.getString(_cacheDateKey);
+      if (cacheDate != today) {
+        return null;
+      }
+      final payload = prefs.getString(_cachePayloadKey);
+      if (payload == null || payload.isEmpty) {
+        return null;
+      }
+      final decoded = jsonDecode(payload) as Map<String, dynamic>;
+      final quote = DailyQuote.fromJson(decoded);
+      if (quote.english.isEmpty || quote.chinese.isEmpty) {
+        return null;
+      }
+      return quote;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _writeCache(String today, DailyQuote quote) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final payload = jsonEncode({
+        'content': quote.english,
+        'note': quote.chinese,
+        'dateline': quote.date,
+        'picture2': quote.imageUrl,
+        'caption': quote.source,
+      });
+      await prefs.setString(_cacheDateKey, today);
+      await prefs.setString(_cachePayloadKey, payload);
+    } catch (_) {
+      // Ignore cache write errors to avoid affecting the main flow.
     }
   }
 }

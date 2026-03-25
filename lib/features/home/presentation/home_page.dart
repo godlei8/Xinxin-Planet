@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/config/feature_flags.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/utils/date_utils.dart' as app_date;
-import '../../../core/widgets/app_feedback.dart';
-import '../../../core/widgets/interactive_pet_companion.dart';
 import '../../../services/providers.dart';
 import '../../habits/domain/habit.dart';
 import '../../habits/presentation/add_edit_habit_page.dart';
 import '../data/daily_quote_service.dart';
+import '../domain/habit_suggestion.dart';
 import '../domain/user_progress.dart';
 import 'habit_card.dart';
 
@@ -22,108 +22,103 @@ class HomePage extends ConsumerWidget {
     final recordsAsync = ref.watch(checkRecordsProvider);
     final progressAsync = ref.watch(userProgressProvider);
     final quoteAsync = ref.watch(dailyQuoteProvider);
-    final petType = ref.watch(petTypeProvider);
-
-    Future<void> refreshAll() async {
-      await Future.wait([
-        ref.read(habitsProvider.notifier).loadHabits(),
-        ref.read(checkRecordsProvider.notifier).loadTodayRecords(),
-        ref.read(userProgressProvider.notifier).loadProgress(),
-      ]);
-      final _ = await ref.refresh(dailyQuoteProvider.future);
-    }
+    final suggestionsAsync = ref.watch(habitSuggestionsProvider);
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openHabitEditor(context),
-        icon: const Icon(Icons.add_rounded),
+        icon: const Icon(Icons.favorite_rounded),
         label: const Text(AppStrings.addHabit),
       ),
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: refreshAll,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
-            children: [
-              progressAsync.when(
-                data: (progress) => recordsAsync.when(
-                  data: (records) => habitsAsync.when(
-                    data: (habits) => _HeroCard(
-                      progress: progress,
-                      completedCount: records.length,
-                      totalCount: habits.length,
-                      petType: petType,
-                      quoteAsync: quoteAsync,
-                      onRefreshQuote: () async {
-                        final _ = await ref.refresh(dailyQuoteProvider.future);
-                      },
+      body: Stack(
+        children: [
+          const Positioned.fill(child: _CandyBackdrop()),
+          SafeArea(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 124),
+              children: [
+                progressAsync.when(
+                  data: (progress) => recordsAsync.when(
+                    data: (records) => habitsAsync.when(
+                      data: (habits) => _HeroCard(
+                        progress: progress,
+                        completedCount: records.length,
+                        totalCount: habits.length,
+                        quoteAsync: quoteAsync,
+                      ),
+                      loading: () => const SizedBox.shrink(),
+                      error: (_, __) => const SizedBox.shrink(),
                     ),
                     loading: () => const SizedBox.shrink(),
                     error: (_, __) => const SizedBox.shrink(),
                   ),
-                  loading: () => const SizedBox.shrink(),
-                  error: (_, __) => const SizedBox.shrink(),
+                  loading: () => const SizedBox(
+                    height: 300,
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                  error: (error, _) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Text('Data load failed: $error'),
+                  ),
                 ),
-                loading: () => const SizedBox(
-                  height: 300,
-                  child: Center(child: CircularProgressIndicator()),
+                const SizedBox(height: AppSpacing.xl),
+                Text(
+                  '今日甜甜任务',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
                 ),
-                error: (error, _) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 24),
-                  child: Text('Data load failed: $error'),
+                const SizedBox(height: 6),
+                Text(
+                  '把计划拆成一颗颗小星星，慢慢点亮今天的进度。',
+                  style: Theme.of(context).textTheme.bodyMedium,
                 ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              Text(
-                '\u4eca\u5929\u7684\u5c0f\u4e60\u60ef',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '\u628a\u4eca\u5929\u62c6\u6210\u51e0\u4e2a\u8f7b\u677e\u7684\u5c0f\u52a8\u4f5c\uff0c\u5b8c\u6210\u8d77\u6765\u4f1a\u66f4\u8212\u670d\u3002',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              habitsAsync.when(
-                data: (habits) {
-                  if (habits.isEmpty) {
-                    return _EmptyHabitsCard(
-                      petType: petType,
-                      onAddPressed: () => _openHabitEditor(context),
-                    );
-                  }
+                if (FeatureFlags.enableHabitSuggestions) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  _SuggestionPanel(suggestionsAsync: suggestionsAsync),
+                ],
+                const SizedBox(height: AppSpacing.md),
+                habitsAsync.when(
+                  data: (habits) {
+                    if (habits.isEmpty) {
+                      return _EmptyHabitsCard(
+                        onAddPressed: () => _openHabitEditor(context),
+                      );
+                    }
 
-                  return recordsAsync.when(
-                    data: (recordsMap) => Column(
-                      children: habits.map((habit) {
-                        final isCheckedIn = recordsMap.containsKey(habit.id);
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                          child: _HabitCardWithStreak(
-                            habit: habit,
-                            isCheckedIn: isCheckedIn,
-                            onCheckIn: () =>
-                                _showCheckInSheet(context, ref, habit),
-                            onTap: () =>
-                                _openHabitEditor(context, habit: habit),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                    loading: () =>
-                        const Center(child: CircularProgressIndicator()),
-                    error: (error, _) => Text('Records load failed: $error'),
-                  );
-                },
-                loading: () => const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 32),
-                  child: Center(child: CircularProgressIndicator()),
+                    return recordsAsync.when(
+                      data: (recordsMap) => Column(
+                        children: habits.map((habit) {
+                          final isCheckedIn = recordsMap.containsKey(habit.id);
+                          return Padding(
+                            padding:
+                                const EdgeInsets.only(bottom: AppSpacing.sm),
+                            child: _HabitCardWithStreak(
+                              habit: habit,
+                              isCheckedIn: isCheckedIn,
+                              onCheckIn: () =>
+                                  _showCheckInSheet(context, ref, habit),
+                              onTap: () =>
+                                  _openHabitEditor(context, habit: habit),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      loading: () =>
+                          const Center(child: CircularProgressIndicator()),
+                      error: (error, _) => Text('Records load failed: $error'),
+                    );
+                  },
+                  loading: () => const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 32),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                  error: (error, _) => Text('Habits load failed: $error'),
                 ),
-                error: (error, _) => Text('Habits load failed: $error'),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -154,52 +149,135 @@ class HomePage extends ConsumerWidget {
   }
 }
 
+class _CandyBackdrop extends StatelessWidget {
+  const _CandyBackdrop();
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return IgnorePointer(
+      child: Stack(
+        children: [
+          Positioned(
+            left: -56,
+            top: -34,
+            child: _PastelBlob(
+              size: 180,
+              color: isDark ? const Color(0x335B4B76) : const Color(0x66FFD7EC),
+            ),
+          ),
+          Positioned(
+            right: -28,
+            top: 168,
+            child: _PastelBlob(
+              size: 120,
+              color: isDark ? const Color(0x33406282) : const Color(0x66D7F0FF),
+            ),
+          ),
+          Positioned(
+            left: 14,
+            bottom: 80,
+            child: _PastelBlob(
+              size: 92,
+              color: isDark ? const Color(0x333E6A5D) : const Color(0x66E3F8DE),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PastelBlob extends StatelessWidget {
+  const _PastelBlob({
+    required this.size,
+    required this.color,
+  });
+
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(size * 0.44),
+      ),
+    );
+  }
+}
+
 class _HeroCard extends StatelessWidget {
   const _HeroCard({
     required this.progress,
     required this.completedCount,
     required this.totalCount,
-    required this.petType,
     required this.quoteAsync,
-    required this.onRefreshQuote,
   });
 
   final UserProgress progress;
   final int completedCount;
   final int totalCount;
-  final PetType petType;
   final AsyncValue<DailyQuote> quoteAsync;
-  final Future<void> Function() onRefreshQuote;
 
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final completionRate = totalCount == 0 ? 0.0 : completedCount / totalCount;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final titleColor =
+        isDark ? const Color(0xFFFFEBF6) : const Color(0xFF653A5A);
+    final subtitleColor =
+        isDark ? const Color(0xFFD8C8D7) : const Color(0xFF8A6680);
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            Theme.of(context).colorScheme.primary,
-            Theme.of(context).colorScheme.secondary,
-          ],
+          colors: isDark
+              ? const [Color(0xFF3D2E4B), Color(0xFF2A3E58)]
+              : const [Color(0xFFFFE1F0), Color(0xFFE3F4FF)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(34),
+        border: Border.all(
+          color: isDark ? const Color(0x66FFFFFF) : const Color(0xCCFFFFFF),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isDark ? const Color(0x66110D15) : const Color(0x33F0B6D6),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
       ),
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           Positioned(
-            top: -26,
-            right: -18,
+            top: -18,
+            right: -10,
+            child: Text(
+              '🎀',
+              style: TextStyle(fontSize: isDark ? 26 : 28),
+            ),
+          ),
+          Positioned(
+            right: 18,
+            top: 48,
             child: Container(
-              width: 116,
-              height: 116,
+              width: 90,
+              height: 90,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.1),
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.07)
+                    : Colors.white.withValues(alpha: 0.4),
                 shape: BoxShape.circle,
               ),
             ),
@@ -207,18 +285,17 @@ class _HeroCard extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: _HeroHeadline(now: now)),
-                  const SizedBox(width: 12),
-                  _HeroPetAccent(type: petType),
-                ],
+              _HeroHeadline(
+                now: now,
+                titleColor: titleColor,
+                subtitleColor: subtitleColor,
               ),
               const SizedBox(height: AppSpacing.md),
               _QuotePanel(
                 quoteAsync: quoteAsync,
-                onRefreshQuote: onRefreshQuote,
+                isDark: isDark,
+                titleColor: titleColor,
+                subtitleColor: subtitleColor,
               ),
               const SizedBox(height: AppSpacing.md),
               Wrap(
@@ -226,16 +303,25 @@ class _HeroCard extends StatelessWidget {
                 runSpacing: AppSpacing.sm,
                 children: [
                   _HeroMetric(
-                    label: '\u5df2\u5b8c\u6210',
+                    label: '已完成',
                     value: '$completedCount/$totalCount',
+                    textColor: titleColor,
+                    subColor: subtitleColor,
+                    isDark: isDark,
                   ),
                   _HeroMetric(
                     label: AppStrings.currentStreak,
                     value: '${progress.currentStreak}${AppStrings.days}',
+                    textColor: titleColor,
+                    subColor: subtitleColor,
+                    isDark: isDark,
                   ),
                   _HeroMetric(
-                    label: '\u661f\u7403\u7b49\u7ea7',
+                    label: '星球等级',
                     value: 'Lv.${progress.planetLevel}',
+                    textColor: titleColor,
+                    subColor: subtitleColor,
+                    isDark: isDark,
                   ),
                 ],
               ),
@@ -244,46 +330,10 @@ class _HeroCard extends StatelessWidget {
                 totalCount: totalCount,
                 completedCount: completedCount,
                 completionRate: completionRate,
+                textColor: titleColor,
+                isDark: isDark,
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeroPetAccent extends StatelessWidget {
-  const _HeroPetAccent({
-    required this.type,
-  });
-
-  final PetType type;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 92,
-      padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(22),
-      ),
-      child: Column(
-        children: [
-          InteractivePetCompanion(
-            type: type,
-            size: 52,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            type.label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
           ),
         ],
       ),
@@ -294,9 +344,13 @@ class _HeroPetAccent extends StatelessWidget {
 class _HeroHeadline extends StatelessWidget {
   const _HeroHeadline({
     required this.now,
+    required this.titleColor,
+    required this.subtitleColor,
   });
 
   final DateTime now;
+  final Color titleColor;
+  final Color subtitleColor;
 
   @override
   Widget build(BuildContext context) {
@@ -306,7 +360,7 @@ class _HeroHeadline extends StatelessWidget {
         Text(
           _greeting(),
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                color: Colors.white,
+                color: titleColor,
                 fontWeight: FontWeight.w900,
               ),
         ),
@@ -314,14 +368,14 @@ class _HeroHeadline extends StatelessWidget {
         Text(
           '${app_date.DateUtils.getWeekdayName(now.weekday)} · ${app_date.DateUtils.formatDateCN(now)}',
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Colors.white.withValues(alpha: 0.9),
+                color: subtitleColor,
               ),
         ),
         const SizedBox(height: 12),
         Text(
-          '\u4eca\u5929\u4e5f\u548c\u5c0f\u4f19\u4f34\u4e00\u8d77\uff0c\u628a\u8ba1\u5212\u8fc7\u5f97\u8f7b\u4e00\u70b9\u3001\u7a33\u4e00\u70b9\u3002',
+          '今天也把计划过得轻一点、稳一点。',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.white,
+                color: titleColor.withValues(alpha: 0.92),
                 height: 1.45,
               ),
         ),
@@ -331,136 +385,58 @@ class _HeroHeadline extends StatelessWidget {
 
   static String _greeting() {
     final hour = DateTime.now().hour;
-    if (hour < 6) return '\u591c\u6df1\u4e86\uff0c\u4e5f\u8f9b\u82e6\u5566';
-    if (hour < 11) return '\u65e9\u5b89\uff0c\u51c6\u5907\u51fa\u53d1';
-    if (hour < 14) {
-      return '\u4e2d\u5348\u597d\uff0c\u7ee7\u7eed\u6162\u6162\u6765';
-    }
-    if (hour < 18) {
-      return '\u4e0b\u5348\u597d\uff0c\u4eca\u5929\u4e5f\u5728\u8fdb\u6b65';
-    }
-    return '\u665a\u4e0a\u597d\uff0c\u6536\u96c6\u4e00\u70b9\u5c0f\u6210\u5c31';
+    if (hour < 6) return '夜深了，也辛苦啦';
+    if (hour < 11) return '早安，准备出发';
+    if (hour < 14) return '中午好，继续慢慢来';
+    if (hour < 18) return '下午好，今天也在进步';
+    return '晚上好，收集一点小成就';
   }
 }
 
-class _QuotePanel extends StatefulWidget {
+class _QuotePanel extends StatelessWidget {
   const _QuotePanel({
     required this.quoteAsync,
-    required this.onRefreshQuote,
+    required this.isDark,
+    required this.titleColor,
+    required this.subtitleColor,
   });
 
   final AsyncValue<DailyQuote> quoteAsync;
-  final Future<void> Function() onRefreshQuote;
-
-  @override
-  State<_QuotePanel> createState() => _QuotePanelState();
-}
-
-class _QuotePanelState extends State<_QuotePanel> {
-  bool _isRefreshing = false;
-  DateTime? _lastRefreshAt;
-  double _refreshTurns = 0;
-
-  Future<void> _handleRefresh() async {
-    if (_isRefreshing) {
-      return;
-    }
-
-    setState(() {
-      _isRefreshing = true;
-      _refreshTurns += 1;
-    });
-    showAppToast(
-      context,
-      '\u6b63\u5728\u5237\u65b0\u6bcf\u65e5\u4e00\u53e5...',
-      type: AppToastType.info,
-      duration: const Duration(milliseconds: 900),
-    );
-
-    try {
-      await widget.onRefreshQuote();
-      if (!mounted) {
-        return;
-      }
-      _lastRefreshAt = DateTime.now();
-      showAppToast(
-        context,
-        '\u6bcf\u65e5\u4e00\u53e5\u5df2\u5237\u65b0',
-        type: AppToastType.success,
-      );
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-      showAppToast(
-        context,
-        '\u5237\u65b0\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5',
-        type: AppToastType.error,
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isRefreshing = false);
-      }
-    }
-  }
+  final bool isDark;
+  final Color titleColor;
+  final Color subtitleColor;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(22),
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.08)
+            : Colors.white.withValues(alpha: 0.74),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.15)
+              : const Color(0xCCFFFFFF),
+        ),
       ),
-      child: widget.quoteAsync.when(
+      child: quoteAsync.when(
         data: (quote) => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                const Icon(Icons.auto_stories_rounded, color: Colors.white),
+                Icon(Icons.auto_stories_rounded, color: titleColor),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '\u6bcf\u65e5\u4e00\u53e5 · Daily Spark',
+                    '每日一句 · Daily Spark',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: Colors.white,
+                          color: titleColor,
                           fontWeight: FontWeight.w800,
                         ),
                   ),
-                ),
-                if (_lastRefreshAt != null && !_isRefreshing)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 4),
-                    child: Text(
-                      '\u521a\u521a\u66f4\u65b0',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.9),
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                  ),
-                IconButton(
-                  onPressed: _isRefreshing ? null : _handleRefresh,
-                  tooltip: '\u5237\u65b0\u6bcf\u65e5\u4e00\u53e5',
-                  icon: _isRefreshing
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : AnimatedRotation(
-                          turns: _refreshTurns,
-                          duration: const Duration(milliseconds: 520),
-                          curve: Curves.easeOutCubic,
-                          child: const Icon(
-                            Icons.refresh_rounded,
-                            color: Colors.white,
-                          ),
-                        ),
                 ),
               ],
             ),
@@ -475,7 +451,7 @@ class _QuotePanelState extends State<_QuotePanel> {
                     Text(
                       quote.english,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: Colors.white,
+                            color: titleColor,
                             fontWeight: FontWeight.w800,
                             height: 1.4,
                           ),
@@ -484,7 +460,7 @@ class _QuotePanelState extends State<_QuotePanel> {
                     Text(
                       quote.chinese,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.94),
+                            color: subtitleColor,
                             height: 1.45,
                           ),
                     ),
@@ -494,17 +470,18 @@ class _QuotePanelState extends State<_QuotePanel> {
                       runSpacing: 8,
                       children: [
                         _QuoteMetaChip(
-                          label:
-                              quote.date.isEmpty ? '\u4eca\u5929' : quote.date,
+                          label: quote.date.isEmpty ? '今天' : quote.date,
                           icon: Icons.calendar_today_rounded,
+                          isDark: isDark,
+                          textColor: titleColor,
                         ),
                         _QuoteMetaChip(
-                          label: quote.isFallback
-                              ? '\u79bb\u7ebf\u5907\u7528\u6587\u6848'
-                              : quote.source,
+                          label: quote.isFallback ? '离线备用文案' : quote.source,
                           icon: quote.isFallback
                               ? Icons.offline_bolt_rounded
                               : Icons.public_rounded,
+                          isDark: isDark,
+                          textColor: titleColor,
                         ),
                       ],
                     ),
@@ -517,17 +494,19 @@ class _QuotePanelState extends State<_QuotePanel> {
                     width: vertical ? double.infinity : 84,
                     height: vertical ? 132 : 104,
                     child: quote.imageUrl.isEmpty
-                        ? _QuoteImageFallback(vertical: vertical)
+                        ? _QuoteImageFallback(
+                            vertical: vertical, isDark: isDark)
                         : Image.network(
                             quote.imageUrl,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                _QuoteImageFallback(vertical: vertical),
+                            errorBuilder: (_, __, ___) => _QuoteImageFallback(
+                                vertical: vertical, isDark: isDark),
                             loadingBuilder: (context, child, loadingProgress) {
                               if (loadingProgress == null) {
                                 return child;
                               }
-                              return _QuoteImageFallback(vertical: vertical);
+                              return _QuoteImageFallback(
+                                  vertical: vertical, isDark: isDark);
                             },
                           ),
                   ),
@@ -556,19 +535,19 @@ class _QuotePanelState extends State<_QuotePanel> {
             ),
           ],
         ),
-        loading: () => const SizedBox(
+        loading: () => SizedBox(
           height: 138,
           child: Center(
-            child: CircularProgressIndicator(color: Colors.white),
+            child: CircularProgressIndicator(color: titleColor),
           ),
         ),
         error: (error, _) => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '\u6bcf\u65e5\u4e00\u53e5\u52a0\u8f7d\u5931\u8d25',
+              '每日一句加载失败',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Colors.white,
+                    color: titleColor,
                     fontWeight: FontWeight.w800,
                   ),
             ),
@@ -576,7 +555,7 @@ class _QuotePanelState extends State<_QuotePanel> {
             Text(
               '$error',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.92),
+                    color: subtitleColor,
                   ),
             ),
           ],
@@ -590,28 +569,34 @@ class _QuoteMetaChip extends StatelessWidget {
   const _QuoteMetaChip({
     required this.label,
     required this.icon,
+    required this.isDark,
+    required this.textColor,
   });
 
   final String label;
   final IconData icon;
+  final bool isDark;
+  final Color textColor;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.12),
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.08)
+            : const Color(0xFFFFEEF7),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: Colors.white),
+          Icon(icon, size: 14, color: textColor),
           const SizedBox(width: 6),
           Text(
             label,
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: Colors.white,
+                  color: textColor,
                   fontWeight: FontWeight.w700,
                 ),
           ),
@@ -624,9 +609,11 @@ class _QuoteMetaChip extends StatelessWidget {
 class _QuoteImageFallback extends StatelessWidget {
   const _QuoteImageFallback({
     required this.vertical,
+    required this.isDark,
   });
 
   final bool vertical;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -635,16 +622,15 @@ class _QuoteImageFallback extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withValues(alpha: 0.28),
-            Colors.white.withValues(alpha: 0.1),
-          ],
+          colors: isDark
+              ? const [Color(0xFF4F3C5A), Color(0xFF2D4C67)]
+              : const [Color(0xFFFFD8EA), Color(0xFFD7EEFF)],
         ),
       ),
       child: Center(
         child: Icon(
           vertical ? Icons.auto_stories_rounded : Icons.menu_book_rounded,
-          color: Colors.white.withValues(alpha: 0.82),
+          color: Colors.white.withValues(alpha: 0.92),
           size: vertical ? 36 : 30,
         ),
       ),
@@ -656,10 +642,16 @@ class _HeroMetric extends StatelessWidget {
   const _HeroMetric({
     required this.label,
     required this.value,
+    required this.textColor,
+    required this.subColor,
+    required this.isDark,
   });
 
   final String label;
   final String value;
+  final Color textColor;
+  final Color subColor;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -668,8 +660,15 @@ class _HeroMetric extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.18),
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.09)
+              : Colors.white.withValues(alpha: 0.7),
           borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.12)
+                : const Color(0xB3FFFFFF),
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -677,14 +676,14 @@ class _HeroMetric extends StatelessWidget {
             Text(
               label,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.9),
+                    color: subColor,
                   ),
             ),
             const SizedBox(height: 4),
             Text(
               value,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: Colors.white,
+                    color: textColor,
                     fontWeight: FontWeight.w900,
                   ),
             ),
@@ -700,35 +699,41 @@ class _ProgressPrompt extends StatelessWidget {
     required this.totalCount,
     required this.completedCount,
     required this.completionRate,
+    required this.textColor,
+    required this.isDark,
   });
 
   final int totalCount;
   final int completedCount;
   final double completionRate;
+  final Color textColor;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     final message = totalCount == 0
-        ? '\u5148\u521b\u5efa\u4e00\u4e2a\u5c0f\u4e60\u60ef\uff0c\u8ba9\u4eca\u5929\u6709\u4e00\u4e2a\u8f7b\u677e\u7684\u5f00\u59cb\u3002'
+        ? '先创建一个小习惯，让今天有一个轻松的开始。'
         : completionRate >= 1
-            ? '\u4eca\u5929\u7684\u4e60\u60ef\u5df2\u7ecf\u5168\u90e8\u5b8c\u6210\uff0c\u72b6\u6001\u8d85\u68d2\u3002'
-            : '\u518d\u5b8c\u6210 ${totalCount - completedCount} \u4e2a\uff0c\u4eca\u5929\u5c31\u4f1a\u66f4\u5706\u6ee1\u3002';
+            ? '今天的习惯已经全部完成，状态超棒。'
+            : '再完成 ${totalCount - completedCount} 个，今天就会更圆满。';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.18),
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.09)
+            : const Color(0xFFFFF5FB),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Row(
         children: [
-          const Icon(Icons.auto_awesome_rounded, color: Colors.white),
+          Icon(Icons.auto_awesome_rounded, color: textColor),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white,
+                    color: textColor,
                     fontWeight: FontWeight.w700,
                   ),
             ),
@@ -739,30 +744,129 @@ class _ProgressPrompt extends StatelessWidget {
   }
 }
 
-class _EmptyHabitsCard extends StatelessWidget {
-  const _EmptyHabitsCard({
-    required this.petType,
-    required this.onAddPressed,
+class _SuggestionPanel extends StatelessWidget {
+  const _SuggestionPanel({
+    required this.suggestionsAsync,
   });
 
-  final PetType petType;
-  final VoidCallback onAddPressed;
+  final AsyncValue<List<HabitSuggestion>> suggestionsAsync;
 
   @override
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: suggestionsAsync.when(
+          data: (items) {
+            if (items.isEmpty) {
+              return const SizedBox.shrink();
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.auto_awesome_rounded, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      '智能建议',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                ...items.map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _SuggestionTile(item: item),
+                  ),
+                ),
+              ],
+            );
+          },
+          loading: () => const SizedBox(
+            height: 56,
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (_, __) => const SizedBox.shrink(),
+        ),
+      ),
+    );
+  }
+}
+
+class _SuggestionTile extends StatelessWidget {
+  const _SuggestionTile({
+    required this.item,
+  });
+
+  final HabitSuggestion item;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: scheme.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            item.title,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: scheme.primary,
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            item.content,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyHabitsCard extends StatelessWidget {
+  const _EmptyHabitsCard({
+    required this.onAddPressed,
+  });
+
+  final VoidCallback onAddPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Card(
+      child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            SizedBox(
-              width: 132,
-              child: PetCompanionCard(
-                type: petType,
-                size: 80,
-                title: petType.label,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            Container(
+              width: 112,
+              height: 112,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: isDark
+                      ? const [Color(0xFF4A3A56), Color(0xFF2F5068)]
+                      : const [Color(0xFFFFDFF0), Color(0xFFDDF1FF)],
+                ),
+                borderRadius: BorderRadius.circular(30),
+              ),
+              alignment: Alignment.center,
+              child: const Text(
+                '🌟',
+                style: TextStyle(fontSize: 44),
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
@@ -780,7 +884,7 @@ class _EmptyHabitsCard extends StatelessWidget {
             ElevatedButton.icon(
               onPressed: onAddPressed,
               icon: const Icon(Icons.add_rounded),
-              label: const Text('\u521b\u5efa\u7b2c\u4e00\u4e2a\u4e60\u60ef'),
+              label: const Text('创建第一个习惯'),
             ),
           ],
         ),

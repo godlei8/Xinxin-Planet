@@ -183,6 +183,44 @@ class NotificationService {
     );
   }
 
+  static Future<void> scheduleHealthReminder({
+    required int id,
+    required String title,
+    required String body,
+    required int intervalMinutes,
+  }) async {
+    if (!await ensurePermissions()) {
+      throw Exception('通知权限未开启');
+    }
+
+    final repeat = _repeatIntervalByMinutes(intervalMinutes);
+    const androidDetails = AndroidNotificationDetails(
+      'health_reminders',
+      '健康提醒',
+      channelDescription: '喝水、久坐、护眼等健康提醒',
+      importance: Importance.high,
+      priority: Priority.high,
+      enableVibration: true,
+      playSound: true,
+    );
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+
+    await _runWithAndroidCacheRecovery(() {
+      return _notificationsPlugin.periodicallyShow(
+        id,
+        title,
+        body,
+        repeat,
+        const NotificationDetails(android: androidDetails, iOS: iosDetails),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      );
+    });
+  }
+
   static Future<void> showInstantNotification({
     required String title,
     required String body,
@@ -212,6 +250,11 @@ class NotificationService {
   }
 
   static Future<void> cancelHabitReminder(int id) async {
+    await initialize();
+    await _runWithAndroidCacheRecovery(() => _notificationsPlugin.cancel(id));
+  }
+
+  static Future<void> cancelHealthReminder(int id) async {
     await initialize();
     await _runWithAndroidCacheRecovery(() => _notificationsPlugin.cancel(id));
   }
@@ -250,6 +293,12 @@ class NotificationService {
         'daily_reminders',
         '\u6bcf\u65e5\u63d0\u9192',
         description: '\u6bcf\u65e5\u6253\u5361\u63d0\u9192',
+        importance: Importance.high,
+      ),
+      AndroidNotificationChannel(
+        'health_reminders',
+        '健康提醒',
+        description: '喝水、久坐、护眼等健康提醒',
         importance: Importance.high,
       ),
       AndroidNotificationChannel(
@@ -359,5 +408,18 @@ class NotificationService {
       scheduledDate = scheduledDate.add(const Duration(days: 1));
     }
     return tz.TZDateTime.from(scheduledDate, tz.local);
+  }
+
+  static RepeatInterval _repeatIntervalByMinutes(int intervalMinutes) {
+    if (intervalMinutes <= 1) {
+      return RepeatInterval.everyMinute;
+    }
+    if (intervalMinutes <= 60) {
+      return RepeatInterval.hourly;
+    }
+    if (intervalMinutes <= 1440) {
+      return RepeatInterval.daily;
+    }
+    return RepeatInterval.weekly;
   }
 }

@@ -40,4 +40,13 @@ class AchievementRepository {
       whereArgs: [id],
     );
   }
+
+  Future<bool> unlockAchievementIfNeeded(String id) async {
+    final achievement = await getAchievementById(id);
+    if (achievement == null || achievement.isUnlocked) {
+      return false;
+    }
+    await unlockAchievement(id);
+    return true;
+  }
 }

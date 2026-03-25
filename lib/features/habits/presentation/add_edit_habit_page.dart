@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/config/feature_flags.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_strings.dart';
@@ -428,6 +429,11 @@ class _AddEditHabitPageState extends ConsumerState<AddEditHabitPage> {
         await ref.read(habitsProvider.notifier).updateHabit(habit);
       } else {
         await ref.read(habitsProvider.notifier).addHabit(habit);
+        if (FeatureFlags.enableAchievementSystem) {
+          await ref.read(achievementServiceProvider).evaluateAndUnlock();
+          ref.invalidate(achievementsProvider);
+          ref.invalidate(achievementProgressProvider);
+        }
       }
 
       final reminderId = NotificationService.reminderIdForHabit(habit.id);

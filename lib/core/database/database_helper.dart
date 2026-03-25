@@ -1,9 +1,11 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
+import 'migration_helper.dart';
+
 class DatabaseHelper {
   static const String _databaseName = 'xinxin_planet.db';
-  static const int _databaseVersion = 1;
+  static const int _databaseVersion = 3;
 
   static const List<String> _exportTables = [
     'habits',
@@ -11,6 +13,8 @@ class DatabaseHelper {
     'categories',
     'achievements',
     'user_progress',
+    'focus_forest',
+    'health_reminders',
   ];
 
   static Database? _database;
@@ -52,7 +56,7 @@ class DatabaseHelper {
         description TEXT DEFAULT '',
         category_id TEXT DEFAULT 'default',
         color_code TEXT DEFAULT '#FF8FA3',
-        icon_code TEXT DEFAULT '⭐',
+        icon_code TEXT DEFAULT '✨',
         frequency INTEGER DEFAULT 0,
         reminder_enabled INTEGER DEFAULT 0,
         reminder_time TEXT,
@@ -70,6 +74,7 @@ class DatabaseHelper {
         note TEXT,
         mood INTEGER,
         focus_minutes INTEGER DEFAULT 0,
+        image_path TEXT,
         FOREIGN KEY (habit_id) REFERENCES habits (id) ON DELETE CASCADE
       )
     ''');
@@ -79,7 +84,7 @@ class DatabaseHelper {
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         color_code TEXT DEFAULT '#FF8FA3',
-        icon_code TEXT DEFAULT '📦',
+        icon_code TEXT DEFAULT '🗂️',
         is_default INTEGER DEFAULT 0,
         created_at INTEGER NOT NULL
       )
@@ -112,19 +117,49 @@ class DatabaseHelper {
       )
     ''');
 
+    await db.execute('''
+      CREATE TABLE focus_forest (
+        id TEXT PRIMARY KEY,
+        duration_sec INTEGER NOT NULL,
+        tree_type TEXT NOT NULL,
+        tree_size TEXT NOT NULL,
+        planted_at INTEGER NOT NULL,
+        is_alive INTEGER DEFAULT 1
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE health_reminders (
+        id TEXT PRIMARY KEY,
+        reminder_type TEXT NOT NULL,
+        interval_minutes INTEGER NOT NULL,
+        is_enabled INTEGER DEFAULT 1,
+        last_triggered INTEGER,
+        daily_target INTEGER DEFAULT 8,
+        daily_completed INTEGER DEFAULT 0,
+        created_at INTEGER NOT NULL
+      )
+    ''');
+
     await _ensureIndexes(db);
     await _insertDefaultCategories(db);
     await _insertDefaultAchievements(db);
     await _insertDefaultUserProgress(db);
+    await _insertDefaultHealthReminders(db);
   }
 
   static Future<void> _ensureIndexes(DatabaseExecutor db) async {
     await db.execute(
-        'CREATE INDEX IF NOT EXISTS idx_check_records_habit_id ON check_records (habit_id)');
+      'CREATE INDEX IF NOT EXISTS idx_check_records_habit_id ON check_records (habit_id)',
+    );
     await db.execute(
-        'CREATE INDEX IF NOT EXISTS idx_check_records_check_date ON check_records (check_date)');
+      'CREATE INDEX IF NOT EXISTS idx_check_records_check_date ON check_records (check_date)',
+    );
     await db.execute(
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_check_records_habit_date ON check_records (habit_id, check_date)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_focus_forest_planted_at ON focus_forest (planted_at DESC)',
     );
   }
 
@@ -135,7 +170,7 @@ class DatabaseHelper {
         'id': 'default',
         'name': '日常',
         'color_code': '#FF8FA3',
-        'icon_code': '🌷',
+        'icon_code': '🌸',
         'is_default': 1,
         'created_at': now,
       },
@@ -183,9 +218,9 @@ class DatabaseHelper {
     final achievements = [
       {
         'id': 'first_checkin',
-        'name': '初次闪亮',
+        'name': '首次发光',
         'description': '完成第一次打卡',
-        'icon_code': '🎉',
+        'icon_code': '✨',
         'unlock_threshold': 1,
         'is_unlocked': 0,
         'created_at': now,
@@ -201,7 +236,7 @@ class DatabaseHelper {
       },
       {
         'id': 'month_master',
-        'name': '月度小达人',
+        'name': '月度达人',
         'description': '连续打卡 30 天',
         'icon_code': '🏆',
         'unlock_threshold': 30,
@@ -221,7 +256,7 @@ class DatabaseHelper {
         'id': 'habit_creator',
         'name': '习惯设计师',
         'description': '创建 5 个习惯',
-        'icon_code': '🪄',
+        'icon_code': '🧩',
         'unlock_threshold': 5,
         'is_unlocked': 0,
         'created_at': now,
@@ -229,22 +264,71 @@ class DatabaseHelper {
     ];
 
     for (final achievement in achievements) {
-      await db.insert('achievements', achievement);
+      await db.insert(
+        'achievements',
+        achievement,
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
     }
   }
 
   static Future<void> _insertDefaultUserProgress(DatabaseExecutor db) async {
     final now = DateTime.now().millisecondsSinceEpoch;
-    await db.insert('user_progress', {
-      'id': 'main_progress',
-      'total_check_ins': 0,
-      'current_streak': 0,
-      'best_streak': 0,
-      'planet_level': 1,
-      'unlocked_decorations': '[]',
-      'created_at': now,
-      'updated_at': now,
-    });
+    await db.insert(
+      'user_progress',
+      {
+        'id': 'main_progress',
+        'total_check_ins': 0,
+        'current_streak': 0,
+        'best_streak': 0,
+        'planet_level': 1,
+        'unlocked_decorations': '[]',
+        'created_at': now,
+        'updated_at': now,
+      },
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
+  }
+
+  static Future<void> _insertDefaultHealthReminders(DatabaseExecutor db) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final defaults = [
+      {
+        'id': 'water_reminder',
+        'reminder_type': 'water',
+        'interval_minutes': 60,
+        'is_enabled': 0,
+        'daily_target': 8,
+        'daily_completed': 0,
+        'created_at': now,
+      },
+      {
+        'id': 'stand_reminder',
+        'reminder_type': 'stand',
+        'interval_minutes': 90,
+        'is_enabled': 0,
+        'daily_target': 6,
+        'daily_completed': 0,
+        'created_at': now,
+      },
+      {
+        'id': 'eye_reminder',
+        'reminder_type': 'eye',
+        'interval_minutes': 45,
+        'is_enabled': 0,
+        'daily_target': 10,
+        'daily_completed': 0,
+        'created_at': now,
+      },
+    ];
+
+    for (final reminder in defaults) {
+      await db.insert(
+        'health_reminders',
+        reminder,
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    }
   }
 
   static Future<Map<String, dynamic>> exportData() async {
@@ -270,12 +354,16 @@ class DatabaseHelper {
       await txn.delete('categories');
       await txn.delete('achievements');
       await txn.delete('user_progress');
+      await txn.delete('focus_forest');
+      await txn.delete('health_reminders');
 
       await _restoreTable(txn, 'categories', data['categories']);
       await _restoreTable(txn, 'habits', data['habits']);
       await _restoreTable(txn, 'check_records', data['check_records']);
       await _restoreTable(txn, 'achievements', data['achievements']);
       await _restoreTable(txn, 'user_progress', data['user_progress']);
+      await _restoreTable(txn, 'focus_forest', data['focus_forest']);
+      await _restoreTable(txn, 'health_reminders', data['health_reminders']);
 
       if (await _isTableEmpty(txn, 'categories')) {
         await _insertDefaultCategories(txn);
@@ -285,6 +373,9 @@ class DatabaseHelper {
       }
       if (await _isTableEmpty(txn, 'user_progress')) {
         await _insertDefaultUserProgress(txn);
+      }
+      if (await _isTableEmpty(txn, 'health_reminders')) {
+        await _insertDefaultHealthReminders(txn);
       }
     });
   }
@@ -297,9 +388,12 @@ class DatabaseHelper {
       await txn.delete('categories');
       await txn.delete('achievements');
       await txn.delete('user_progress');
+      await txn.delete('focus_forest');
+      await txn.delete('health_reminders');
       await _insertDefaultCategories(txn);
       await _insertDefaultAchievements(txn);
       await _insertDefaultUserProgress(txn);
+      await _insertDefaultHealthReminders(txn);
     });
   }
 
@@ -330,7 +424,14 @@ class DatabaseHelper {
 
   static Future<void> _onUpgrade(
       Database db, int oldVersion, int newVersion) async {
+    await MigrationHelper.upgradeDatabase(db, oldVersion, newVersion);
     await _ensureIndexes(db);
+    if (await _isTableEmpty(db, 'achievements')) {
+      await _insertDefaultAchievements(db);
+    }
+    if (await _isTableEmpty(db, 'health_reminders')) {
+      await _insertDefaultHealthReminders(db);
+    }
   }
 
   static Future<void> close() async {

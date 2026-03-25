@@ -3,15 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/config/feature_flags.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/widgets/app_feedback.dart';
-import '../../../core/widgets/interactive_pet_companion.dart';
+import '../../../features/habits/presentation/achievement_page.dart';
+import '../../../features/settings/domain/health_reminder.dart';
 import '../../../services/backup_service.dart';
 import '../../../services/notification_service.dart';
 import '../../../services/providers.dart';
-import 'pet_studio_page.dart';
 
 final dailyReminderEnabledProvider = StateProvider<bool>((ref) => false);
 final dailyReminderTimeProvider =
@@ -47,33 +48,36 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Future<void> _saveReminderSettings(bool enabled, TimeOfDay time) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final formattedTime = time.format(context);
     final prefs = await SharedPreferences.getInstance();
-
     await prefs.setBool('daily_reminder_enabled', enabled);
     await prefs.setInt('daily_reminder_hour', time.hour);
     await prefs.setInt('daily_reminder_minute', time.minute);
 
-    if (enabled) {
-      await NotificationService.scheduleDailyReminder(
-        id: 9999,
-        title: '每日打卡提醒',
-        body: '今天也给自己留一点点坚持的光。',
-        hour: time.hour,
-        minute: time.minute,
-      );
-      if (mounted) {
-        messenger.showSnackBar(
-          SnackBar(content: Text('已设置每天 $formattedTime 提醒')),
-        );
-      }
-    } else {
+    if (!enabled) {
       await NotificationService.cancelHabitReminder(9999);
-      if (mounted) {
-        messenger.showSnackBar(const SnackBar(content: Text('已关闭每日提醒')));
+      if (!mounted) {
+        return;
       }
+      showAppToast(context, '已关闭每日提醒', type: AppToastType.info);
+      return;
     }
+
+    await NotificationService.scheduleDailyReminder(
+      id: 9999,
+      title: '每日打卡提醒',
+      body: '今天也给自己留一点坚持的时间。',
+      hour: time.hour,
+      minute: time.minute,
+    );
+
+    if (!mounted) {
+      return;
+    }
+    showAppToast(
+      context,
+      '提醒时间已更新为 ${time.format(context)}',
+      type: AppToastType.success,
+    );
   }
 
   Future<void> _reloadData() async {
@@ -84,15 +88,27 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     ]);
     ref.invalidate(categoriesProvider);
     ref.invalidate(achievementsProvider);
+    ref.invalidate(achievementProgressProvider);
   }
 
   @override
   Widget build(BuildContext context) {
     final themeColorIndex = ref.watch(themeColorIndexProvider);
     final isDarkMode = ref.watch(isDarkModeProvider);
-    final petType = ref.watch(petTypeProvider);
     final dailyReminderEnabled = ref.watch(dailyReminderEnabledProvider);
     final dailyReminderTime = ref.watch(dailyReminderTimeProvider);
+    final achievementsAsync = ref.watch(achievementsProvider);
+    final healthRemindersAsync = ref.watch(healthRemindersProvider);
+
+    final unlockedCount = achievementsAsync.maybeWhen(
+      data: (achievements) =>
+          achievements.where((item) => item.isUnlocked).length,
+      orElse: () => 0,
+    );
+    final totalAchievementCount = achievementsAsync.maybeWhen(
+      data: (achievements) => achievements.length,
+      orElse: () => 0,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -102,7 +118,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
-            _ProfileCard(isDarkMode: isDarkMode, petType: petType),
+            _ProfileCard(isDarkMode: isDarkMode),
             const SizedBox(height: AppSpacing.lg),
             const _SectionTitle(title: '外观'),
             Card(
@@ -114,7 +130,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     Text('主题色', style: Theme.of(context).textTheme.titleLarge),
                     const SizedBox(height: AppSpacing.sm),
                     Text(
-                      '挑一个最像今天心情的颜色。',
+                      '挑一个最符合你今天心情的颜色。',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                     const SizedBox(height: AppSpacing.md),
@@ -170,7 +186,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                             : Icons.light_mode_rounded,
                       ),
                       title: const Text('深色模式'),
-                      subtitle: Text(isDarkMode ? '夜晚也很柔和' : '保持明亮轻盈'),
+                      subtitle: Text(isDarkMode ? '夜间阅读更舒适' : '保持明亮与轻盈'),
                       trailing: Switch.adaptive(
                         value: isDarkMode,
                         onChanged: _saveDarkMode,
@@ -181,69 +197,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
-            const _SectionTitle(title: '互动宠物'),
+            const _SectionTitle(title: '成长'),
             Card(
-              clipBehavior: Clip.antiAlias,
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: _openPetStudio,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 72,
-                          height: 72,
-                          clipBehavior: Clip.antiAlias,
-                          decoration: BoxDecoration(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .primary
-                                .withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          alignment: Alignment.center,
-                          child: PetAvatarPreview(
-                            type: petType,
-                            size: 48,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '宠物陪伴',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.w800),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '当前是 ${petType.label}，进入独立页面配置。',
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ],
-                    ),
-                  ),
+              child: ListTile(
+                leading: const Icon(Icons.emoji_events_rounded),
+                title: const Text('成就系统'),
+                subtitle: Text(
+                  totalAchievementCount == 0
+                      ? '查看你的成长里程碑'
+                      : '已解锁 $unlockedCount / $totalAchievementCount',
                 ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: _openAchievementPage,
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
@@ -262,20 +227,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     trailing: Switch.adaptive(
                       value: dailyReminderEnabled,
                       onChanged: (value) async {
-                        final messenger = ScaffoldMessenger.of(context);
                         ref.read(dailyReminderEnabledProvider.notifier).state =
                             value;
                         try {
                           await _saveReminderSettings(value, dailyReminderTime);
                         } catch (error) {
-                          if (!mounted) {
+                          if (!context.mounted) {
                             return;
                           }
                           ref
                               .read(dailyReminderEnabledProvider.notifier)
                               .state = false;
-                          messenger.showSnackBar(
-                            SnackBar(content: Text('提醒设置失败：$error')),
+                          showAppToast(
+                            context,
+                            '提醒设置失败：$error',
+                            type: AppToastType.error,
                           );
                         }
                       },
@@ -297,12 +263,40 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ListTile(
                     leading: const Icon(Icons.mark_chat_unread_rounded),
                     title: const Text('发送测试通知'),
-                    subtitle: const Text('检查提醒权限和通知展示是否正常'),
+                    subtitle: const Text('检查权限和通知样式是否生效'),
                     onTap: _sendTestNotification,
                   ),
                 ],
               ),
             ),
+            if (FeatureFlags.enableHealthReminders) ...[
+              const SizedBox(height: AppSpacing.lg),
+              const _SectionTitle(title: '健康习惯联动'),
+              Card(
+                child: healthRemindersAsync.when(
+                  data: (items) {
+                    if (items.isEmpty) {
+                      return const ListTile(
+                        title: Text('暂无健康提醒配置'),
+                      );
+                    }
+                    return Column(
+                      children: items
+                          .map((item) => _buildHealthReminderTile(item))
+                          .toList(growable: false),
+                    );
+                  },
+                  loading: () => const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                  error: (error, _) => ListTile(
+                    title: const Text('健康提醒加载失败'),
+                    subtitle: Text('$error'),
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: AppSpacing.lg),
             const _SectionTitle(title: '数据'),
             Card(
@@ -316,14 +310,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ),
                   ListTile(
                     leading: const Icon(Icons.restore_rounded),
-                    title: const Text('恢复最近一次备份'),
-                    subtitle: const Text('用最近导出的文件恢复当前数据'),
+                    title: const Text('恢复最近备份'),
+                    subtitle: const Text('使用最近导出的文件恢复当前数据'),
                     onTap: _busy ? null : _restoreBackup,
                   ),
                   ListTile(
                     leading: const Icon(Icons.share_rounded),
-                    title: const Text('分享最近一次备份'),
-                    subtitle: const Text('把最近一次备份文件发送出去'),
+                    title: const Text('分享最近备份'),
+                    subtitle: const Text('将最近一次备份文件发送出去'),
                     onTap: _busy ? null : _shareBackup,
                   ),
                   ListTile(
@@ -332,7 +326,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       color: AppColors.errorColor,
                     ),
                     title: const Text('清空所有数据'),
-                    subtitle: const Text('会清除习惯、记录和成长数据'),
+                    subtitle: const Text('会删除习惯、记录、成就和成长数据'),
                     onTap: _busy ? null : _confirmClearAllData,
                   ),
                 ],
@@ -346,12 +340,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ListTile(
                     leading: Icon(Icons.auto_awesome_rounded),
                     title: Text('欣欣星球'),
-                    subtitle: Text('极简可爱的习惯、日历、专注与互动小伙伴'),
+                    subtitle: Text('一个温柔、可爱的习惯养成应用'),
                   ),
                   ListTile(
                     leading: Icon(Icons.info_outline_rounded),
                     title: Text('版本'),
-                    subtitle: Text('3.1.0'),
+                    subtitle: Text('3.2.1'),
                   ),
                 ],
               ),
@@ -378,10 +372,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     await prefs.setBool('dark_mode', value);
   }
 
-  void _openPetStudio() {
+  void _openAchievementPage() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => const PetStudioPage(),
+        builder: (context) => const AchievementPage(),
       ),
     );
   }
@@ -402,9 +396,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('修改提醒时间失败：$error')),
-      );
+      showAppToast(context, '修改提醒时间失败：$error', type: AppToastType.error);
     }
   }
 
@@ -416,8 +408,168 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('测试通知已发送')));
+    showAppToast(context, '测试通知已发送', type: AppToastType.success);
+  }
+
+  Widget _buildHealthReminderTile(HealthReminder reminder) {
+    const options = [30, 45, 60, 90, 120, 180];
+
+    return ListTile(
+      leading: Text(
+        _healthEmoji(reminder.reminderType),
+        style: const TextStyle(fontSize: 24),
+      ),
+      title: Text(_healthLabel(reminder.reminderType)),
+      subtitle: Text(
+        reminder.isEnabled ? '每 ${reminder.intervalMinutes} 分钟提醒一次' : '已关闭',
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          PopupMenuButton<int>(
+            tooltip: '修改频率',
+            onSelected: (value) => _updateHealthInterval(reminder, value),
+            itemBuilder: (context) => options
+                .map(
+                  (item) => PopupMenuItem<int>(
+                    value: item,
+                    child: Text('每 $item 分钟'),
+                  ),
+                )
+                .toList(growable: false),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Theme.of(context)
+                    .colorScheme
+                    .primary
+                    .withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '${reminder.intervalMinutes}分钟',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Switch.adaptive(
+            value: reminder.isEnabled,
+            onChanged: (value) => _toggleHealthReminder(reminder, value),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _toggleHealthReminder(
+    HealthReminder reminder,
+    bool enabled,
+  ) async {
+    final updated = reminder.copyWith(isEnabled: enabled);
+    await ref.read(healthRemindersProvider.notifier).updateReminder(updated);
+    await _syncHealthReminder(updated);
+    if (!mounted) {
+      return;
+    }
+    showAppToast(
+      context,
+      enabled
+          ? '${_healthLabel(reminder.reminderType)}已开启'
+          : '${_healthLabel(reminder.reminderType)}已关闭',
+      type: enabled ? AppToastType.success : AppToastType.info,
+    );
+  }
+
+  Future<void> _updateHealthInterval(
+    HealthReminder reminder,
+    int intervalMinutes,
+  ) async {
+    final updated = reminder.copyWith(intervalMinutes: intervalMinutes);
+    await ref.read(healthRemindersProvider.notifier).updateReminder(updated);
+    if (updated.isEnabled) {
+      await _syncHealthReminder(updated);
+    }
+    if (!mounted) {
+      return;
+    }
+    showAppToast(
+      context,
+      '${_healthLabel(reminder.reminderType)}频率已更新',
+      type: AppToastType.success,
+    );
+  }
+
+  Future<void> _syncHealthReminder(HealthReminder reminder) async {
+    final id = _healthReminderId(reminder.reminderType);
+    if (!reminder.isEnabled) {
+      await NotificationService.cancelHealthReminder(id);
+      return;
+    }
+
+    await NotificationService.scheduleHealthReminder(
+      id: id,
+      title: _healthTitle(reminder.reminderType),
+      body: _healthBody(reminder.reminderType),
+      intervalMinutes: reminder.intervalMinutes,
+    );
+  }
+
+  int _healthReminderId(String type) => type.hashCode & 0x7fffffff;
+
+  String _healthEmoji(String type) {
+    switch (type) {
+      case 'water':
+        return '💧';
+      case 'stand':
+        return '🧍';
+      case 'eye':
+        return '👀';
+      default:
+        return '✅';
+    }
+  }
+
+  String _healthLabel(String type) {
+    switch (type) {
+      case 'water':
+        return '喝水提醒';
+      case 'stand':
+        return '久坐提醒';
+      case 'eye':
+        return '护眼提醒';
+      default:
+        return '健康提醒';
+    }
+  }
+
+  String _healthTitle(String type) {
+    switch (type) {
+      case 'water':
+        return '💧 喝水时间到';
+      case 'stand':
+        return '🧍 起身活动一下';
+      case 'eye':
+        return '👀 让眼睛休息一会';
+      default:
+        return '健康提醒';
+    }
+  }
+
+  String _healthBody(String type) {
+    switch (type) {
+      case 'water':
+        return '补充一点水分，保持状态在线。';
+      case 'stand':
+        return '久坐会累，走动 3-5 分钟更舒服。';
+      case 'eye':
+        return '看看远处，给眼睛一点放松时间。';
+      default:
+        return '照顾好自己，稳稳变好。';
+    }
   }
 
   Future<void> _exportBackup() async {
@@ -427,16 +579,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('备份已保存到 ${p.basename(file.path)}')),
+      showAppToast(
+        context,
+        '备份已保存到 ${p.basename(file.path)}',
+        type: AppToastType.success,
       );
     } catch (error) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('导出失败：$error')),
-      );
+      showAppToast(context, '导出失败：$error', type: AppToastType.error);
     } finally {
       if (mounted) {
         setState(() => _busy = false);
@@ -452,16 +604,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已从 ${p.basename(file.path)} 恢复数据')),
+      showAppToast(
+        context,
+        '已从 ${p.basename(file.path)} 恢复数据',
+        type: AppToastType.success,
       );
     } catch (error) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('恢复失败：$error')),
-      );
+      showAppToast(context, '恢复失败：$error', type: AppToastType.error);
     } finally {
       if (mounted) {
         setState(() => _busy = false);
@@ -476,16 +628,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已分享 ${p.basename(file.path)}')),
+      showAppToast(
+        context,
+        '已分享 ${p.basename(file.path)}',
+        type: AppToastType.success,
       );
     } catch (error) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('分享失败：$error')),
-      );
+      showAppToast(context, '分享失败：$error', type: AppToastType.error);
     } finally {
       if (mounted) {
         setState(() => _busy = false);
@@ -498,7 +650,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('清空所有数据'),
-        content: const Text('这会删除所有习惯、打卡记录和成长进度，且无法撤销。'),
+        content: const Text('这会删除所有习惯、打卡记录和成长数据，且无法撤销。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -524,7 +676,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       await NotificationService.cancelAllReminders();
       ref.read(themeColorIndexProvider.notifier).state = 0;
       ref.read(isDarkModeProvider.notifier).state = false;
-      ref.read(petTypeProvider.notifier).state = PetType.bunny;
       ref.read(dailyReminderEnabledProvider.notifier).state = false;
       ref.read(dailyReminderTimeProvider.notifier).state =
           const TimeOfDay(hour: 21, minute: 0);
@@ -532,15 +683,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('所有本地数据已清空')));
+      showAppToast(context, '所有本地数据已清空', type: AppToastType.warning);
     } catch (error) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('清空失败：$error')),
-      );
+      showAppToast(context, '清空失败：$error', type: AppToastType.error);
     } finally {
       if (mounted) {
         setState(() => _busy = false);
@@ -552,22 +700,19 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 class _ProfileCard extends StatelessWidget {
   const _ProfileCard({
     required this.isDarkMode,
-    required this.petType,
   });
 
   final bool isDarkMode;
-  final PetType petType;
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            Theme.of(context).colorScheme.primary,
-            AppColors.secondaryColor,
-          ],
+          colors: [scheme.primary, scheme.secondary],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -577,18 +722,18 @@ class _ProfileCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 102,
-            height: 102,
-            clipBehavior: Clip.antiAlias,
+            width: 82,
+            height: 82,
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
             ),
             alignment: Alignment.center,
-            child: PetAvatarPreview(
-              type: petType,
-              size: 64,
+            child: const Icon(
+              Icons.palette_rounded,
+              color: Colors.white,
+              size: 34,
             ),
           ),
           const SizedBox(width: AppSpacing.md),
@@ -597,18 +742,18 @@ class _ProfileCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '把设置调成你喜欢的样子',
+                  '把应用调成你喜欢的样子',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         color: Colors.white,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w900,
                       ),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  isDarkMode ? '当前是深色氛围，夜晚更柔和。' : '当前是浅色氛围，整体更轻盈。',
+                  isDarkMode ? '当前为深色模式，夜间使用更舒适。' : '当前为浅色模式，页面更明快。',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.92),
-                        height: 1.45,
+                        color: Colors.white.withValues(alpha: 0.94),
+                        height: 1.4,
                       ),
                 ),
               ],
