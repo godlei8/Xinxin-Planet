@@ -10,7 +10,7 @@ import '../../../services/providers.dart';
 import '../../habits/domain/habit.dart';
 import '../../habits/presentation/add_edit_habit_page.dart';
 import '../../planet/domain/planet_pet.dart';
-import '../../planet/presentation/widgets/pet_model_view.dart';
+import '../../planet/presentation/widgets/cute_pet_avatar.dart';
 import '../data/daily_quote_service.dart';
 import '../domain/habit_suggestion.dart';
 import '../domain/user_progress.dart';
@@ -209,22 +209,8 @@ class _HeroCard extends StatelessWidget {
           Positioned(
             top: -18,
             right: -10,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '\u{1F98B}',
-                  style: TextStyle(fontSize: isDark ? 24 : 26),
-                ),
-                const SizedBox(width: 2),
-                Icon(
-                  Icons.favorite_rounded,
-                  size: isDark ? 14 : 15,
-                  color: isDark
-                      ? const Color(0xFFFFB8D7)
-                      : const Color(0xFFE86EA4),
-                ),
-              ],
+            child: _ButterflyBadge(
+              isDark: isDark,
             ),
           ),
           Positioned(
@@ -396,6 +382,98 @@ class _CoinsBadge extends StatelessWidget {
   }
 }
 
+class _ButterflyBadge extends StatelessWidget {
+  const _ButterflyBadge({required this.isDark});
+
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 34,
+      height: 26,
+      child: CustomPaint(
+        painter: _ButterflyPainter(
+          wingTop: isDark ? const Color(0xFFFFD2E8) : const Color(0xFFFF92C4),
+          wingBottom:
+              isDark ? const Color(0xFFC9B8FF) : const Color(0xFF8EB7FF),
+          bodyColor: isDark ? const Color(0xFFF8EFFF) : const Color(0xFF7A4F70),
+        ),
+      ),
+    );
+  }
+}
+
+class _ButterflyPainter extends CustomPainter {
+  const _ButterflyPainter({
+    required this.wingTop,
+    required this.wingBottom,
+    required this.bodyColor,
+  });
+
+  final Color wingTop;
+  final Color wingBottom;
+  final Color bodyColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final topWingPaint = Paint()..color = wingTop;
+    final bottomWingPaint = Paint()..color = wingBottom;
+    final bodyPaint = Paint()..color = bodyColor;
+
+    canvas.drawOval(
+      Rect.fromLTWH(size.width * 0.05, size.height * 0.1, size.width * 0.35,
+          size.height * 0.42),
+      topWingPaint,
+    );
+    canvas.drawOval(
+      Rect.fromLTWH(size.width * 0.6, size.height * 0.1, size.width * 0.35,
+          size.height * 0.42),
+      topWingPaint,
+    );
+    canvas.drawOval(
+      Rect.fromLTWH(size.width * 0.09, size.height * 0.48, size.width * 0.31,
+          size.height * 0.34),
+      bottomWingPaint,
+    );
+    canvas.drawOval(
+      Rect.fromLTWH(size.width * 0.6, size.height * 0.48, size.width * 0.31,
+          size.height * 0.34),
+      bottomWingPaint,
+    );
+
+    final bodyRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(size.width * 0.46, size.height * 0.16, size.width * 0.08,
+          size.height * 0.6),
+      const Radius.circular(999),
+    );
+    canvas.drawRRect(bodyRect, bodyPaint);
+
+    final antenna = Paint()
+      ..color = bodyColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(
+      Offset(size.width * 0.49, size.height * 0.16),
+      Offset(size.width * 0.41, size.height * 0.02),
+      antenna,
+    );
+    canvas.drawLine(
+      Offset(size.width * 0.51, size.height * 0.16),
+      Offset(size.width * 0.59, size.height * 0.02),
+      antenna,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _ButterflyPainter oldDelegate) {
+    return oldDelegate.wingTop != wingTop ||
+        oldDelegate.wingBottom != wingBottom ||
+        oldDelegate.bodyColor != bodyColor;
+  }
+}
+
 class _HeroPetPeek extends StatelessWidget {
   const _HeroPetPeek({
     required this.petAsync,
@@ -407,64 +485,131 @@ class _HeroPetPeek extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final width = compact ? double.infinity : 118.0;
+    final width = compact ? double.infinity : 200.0;
     final scheme = Theme.of(context).colorScheme;
 
     return SizedBox(
       width: width,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.46),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.6)),
+          color: Colors.white.withValues(alpha: 0.62),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.75)),
+          boxShadow: [
+            BoxShadow(
+              color: scheme.primary.withValues(alpha: 0.14),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
         ),
         child: Padding(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           child: petAsync.when(
-            data: (pet) => Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            data: (pet) => Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Text(
-                  pet.name,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: scheme.primary,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.2,
-                      ),
+                CutePetAvatar(
+                  speciesId: pet.species,
+                  size: 82,
+                  withShadow: false,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '${pet.speciesMeta.label} 路 Lv.${pet.level}',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: scheme.onSurface.withValues(alpha: 0.74),
-                        fontWeight: FontWeight.w700,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        pet.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              color: scheme.primary,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.2,
+                            ),
                       ),
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  height: 72,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
-                    child: PetModelView(
-                      modelAsset: pet.speciesMeta.modelAsset,
-                      alt: pet.speciesMeta.label,
-                    ),
+                      const SizedBox(height: 1),
+                      Text(
+                        '${pet.speciesMeta.label} · Lv.${pet.level}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: scheme.onSurface.withValues(alpha: 0.78),
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          _MiniStatChip(
+                            icon: Icons.bolt_rounded,
+                            value: '${pet.energy}',
+                            color: const Color(0xFF3FAF7A),
+                          ),
+                          const SizedBox(width: 6),
+                          _MiniStatChip(
+                            icon: Icons.favorite_rounded,
+                            value: '${pet.mood}',
+                            color: const Color(0xFFE870A3),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
             loading: () => const SizedBox(
-              height: 92,
+              height: 98,
               child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
             ),
             error: (_, __) => const SizedBox(
-              height: 92,
+              height: 98,
               child: Center(
                 child: Icon(Icons.pets_rounded),
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _MiniStatChip extends StatelessWidget {
+  const _MiniStatChip({
+    required this.icon,
+    required this.value,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 3),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+        ],
       ),
     );
   }

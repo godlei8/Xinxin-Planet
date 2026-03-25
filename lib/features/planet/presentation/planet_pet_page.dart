@@ -9,7 +9,7 @@ import '../../../core/widgets/app_feedback.dart';
 import '../../../core/widgets/sanrio_background.dart';
 import '../../../services/providers.dart';
 import '../domain/planet_pet.dart';
-import 'widgets/pet_model_view.dart';
+import 'widgets/cute_pet_avatar.dart';
 
 class PlanetPetPage extends ConsumerStatefulWidget {
   const PlanetPetPage({super.key});
@@ -203,9 +203,8 @@ class _PetHeroCard extends StatelessWidget {
         builder: (context, constraints) {
           final compact = constraints.maxWidth < 390;
           final model = _AnimatedPetPreview(
-            modelAsset: pet.speciesMeta.modelAsset,
-            alt: pet.speciesMeta.label,
-            size: compact ? 130 : 150,
+            speciesId: pet.species,
+            size: compact ? 136 : 158,
           );
 
           final info = Column(
@@ -298,13 +297,11 @@ class _PetHeroCard extends StatelessWidget {
 
 class _AnimatedPetPreview extends StatefulWidget {
   const _AnimatedPetPreview({
-    required this.modelAsset,
-    required this.alt,
+    required this.speciesId,
     required this.size,
   });
 
-  final String modelAsset;
-  final String alt;
+  final String speciesId;
   final double size;
 
   @override
@@ -352,10 +349,11 @@ class _AnimatedPetPreviewState extends State<_AnimatedPetPreview>
           child: RepaintBoundary(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(24),
-              child: PetModelView(
-                modelAsset: widget.modelAsset,
-                alt: widget.alt,
-                cameraControls: true,
+              child: Center(
+                child: CutePetAvatar(
+                  speciesId: widget.speciesId,
+                  size: widget.size * 0.84,
+                ),
               ),
             ),
           ),
@@ -383,11 +381,16 @@ class _SpeciesSelector extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '3D 宠物外观库（5 种）',
+              'Q版宠物外观库（10 种）',
               style: Theme.of(context)
                   .textTheme
                   .titleMedium
                   ?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '已切换为 2D 立体风格，加载更快、显示更稳定。',
+              style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 8),
             Wrap(

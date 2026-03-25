@@ -42,7 +42,7 @@
 ### 4.1 首页（Home）
 
 - 展示今日任务、完成进度、每日一句
-- 本版新增：首页大卡片展示当前 3D 宠物概览
+- 本版新增：首页大卡片展示当前 Q版宠物概览
 - 每日一句区域已移除图片展示，仅保留文案信息
 
 ### 4.2 习惯与成就（Habits / Achievement）
@@ -71,31 +71,29 @@
 
 ### 4.6 星球宠物（Planet Pet）
 
-- 本版升级为 3D 宠物体系
-- 物种：`panda / rabbit / cat / dog / fox`
+- 本版升级为 Q版 2D 立体风宠物体系
+- 物种：`panda / rabbit / cat / dog / fox / hamster / penguin / koala / deer / alpaca`
 - 交互动作：`feed / play / pet / rest`
 - 成长字段：`level / exp / energy / mood`
 - 数据存储：`planet_pet_profile_v1`（SharedPreferences）
 
 ## 5. 本版增量开发（v5.0.0）
 
-### 5.1 3D 宠物能力
+### 5.1 宠物能力升级
 
-- 新增模型资源目录：`assets/models/`
-- 新增组件：`PetModelView`
+- 新增组件：`CutePetAvatar`
 - 新增物种定义：`PlanetPetSpecies`
-- 升级页面：`planet_pet_page.dart`（模型预览、动作交互、外观切换）
+- 升级页面：`planet_pet_page.dart`（Q版宠物预览、动作交互、外观切换）
 
 ### 5.2 首页整合
 
 - `home_page.dart` 读取 `planetPetProvider`
-- 大卡片新增宠物信息与 3D 小预览
+- 大卡片新增宠物信息与 Q版小预览
 - 每日一句卡片移除图片布局
 
 ### 5.3 安卓兼容优化
 
-- `AndroidManifest.xml` 添加 `android:usesCleartextTraffic="true"`
-- 提升 WebView 场景下 3D 模型加载稳定性
+- 移除不必要的 `usesCleartextTraffic`，恢复默认安全策略
 
 ### 5.4 通知可靠性优化
 
@@ -109,9 +107,10 @@
 - 修复首页蝴蝶装饰乱码（使用 Unicode 转义，避免编码污染）
 - 金币图标改为 `Icons.monetization_on_rounded`，规避 emoji 字体兼容问题
 
-### 6.2 3D 宠物模型与交互逻辑
+### 6.2 Q版宠物与交互逻辑
 
-- 重制 5 个本地 GLB 模型（Q 版细节更完整）
+- 从 3D 模型切换为 Q版 2D 立体风渲染，降低加载开销
+- 新增 5 个宠物物种，总数扩展到 10 种
 - 宠物名称字号与字重提升，强化识别
 - 宠物切换优化：状态先更新、异步持久化，缩短用户感知延迟
 - 新增每日互动次数机制：
@@ -119,11 +118,10 @@
   - 完成 1 个习惯打卡：+1 次当日互动额度
   - 次数耗尽后阻断互动并提示引导
 
-### 6.3 模型渲染性能优化
+### 6.3 渲染性能优化
 
-- `ModelViewer` 调整为 `loading: eager`
-- 关闭多余交互提示并优化自动旋转参数
-- 关键 3D 区域增加 `RepaintBoundary`，降低重绘影响
+- 关键宠物显示区域增加 `RepaintBoundary`，降低重绘影响
+- 统一改为本地 Flutter 组件绘制，避免 WebView 渲染抖动
 
 ## 7. 工程质量门禁
 
@@ -170,4 +168,3 @@ flutter build apk --debug
 - Android 自适应质量标准：<https://developer.android.com/docs/quality-guidelines/adaptive-app-quality>
 - Android 通知权限：<https://developer.android.com/develop/ui/views/notifications/notification-permission>
 - Android 闹钟与精确提醒：<https://developer.android.com/develop/background-work/services/alarms>
-- model_viewer_plus：<https://pub.dev/packages/model_viewer_plus>

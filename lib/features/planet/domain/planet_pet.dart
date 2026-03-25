@@ -4,51 +4,85 @@ class PlanetPetSpecies {
   const PlanetPetSpecies({
     required this.id,
     required this.label,
-    required this.modelAsset,
     required this.story,
   });
 
   final String id;
   final String label;
-  final String modelAsset;
   final String story;
 
   static const panda = PlanetPetSpecies(
     id: 'panda',
     label: '大熊猫',
-    modelAsset: 'assets/models/panda.glb',
     story: '稳重温柔，最擅长陪你慢慢变厉害。',
   );
 
   static const rabbit = PlanetPetSpecies(
     id: 'rabbit',
     label: '兔子',
-    modelAsset: 'assets/models/rabbit.glb',
     story: '灵巧轻快，会提醒你把任务拆小做完。',
   );
 
   static const cat = PlanetPetSpecies(
     id: 'cat',
     label: '猫咪',
-    modelAsset: 'assets/models/cat.glb',
     story: '优雅自律，把每次打卡都变成小仪式。',
   );
 
   static const dog = PlanetPetSpecies(
     id: 'dog',
     label: '小狗',
-    modelAsset: 'assets/models/dog.glb',
     story: '活力满格，最会给你情绪价值。',
   );
 
   static const fox = PlanetPetSpecies(
     id: 'fox',
     label: '狐狸',
-    modelAsset: 'assets/models/fox.glb',
     story: '机灵聪明，适合挑战更高目标。',
   );
 
-  static const values = [panda, rabbit, cat, dog, fox];
+  static const hamster = PlanetPetSpecies(
+    id: 'hamster',
+    label: '仓鼠',
+    story: '圆滚滚的小能量包，适合碎片化打卡。',
+  );
+
+  static const penguin = PlanetPetSpecies(
+    id: 'penguin',
+    label: '企鹅',
+    story: '冷静可爱，擅长帮你稳定专注节奏。',
+  );
+
+  static const koala = PlanetPetSpecies(
+    id: 'koala',
+    label: '考拉',
+    story: '慢慢来也能很厉害，陪你温柔坚持。',
+  );
+
+  static const deer = PlanetPetSpecies(
+    id: 'deer',
+    label: '小鹿',
+    story: '轻盈灵动，适合目标升级挑战。',
+  );
+
+  static const alpaca = PlanetPetSpecies(
+    id: 'alpaca',
+    label: '羊驼',
+    story: '治愈感满满，让每天都松弛又有进步。',
+  );
+
+  static const values = [
+    panda,
+    rabbit,
+    cat,
+    dog,
+    fox,
+    hamster,
+    penguin,
+    koala,
+    deer,
+    alpaca,
+  ];
 
   static PlanetPetSpecies byId(String id) {
     return values.firstWhere(
