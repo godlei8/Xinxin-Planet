@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:table_calendar/table_calendar.dart';
@@ -7,6 +9,7 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/utils/date_utils.dart' as app_date;
 import '../../../core/utils/streak_calculator.dart';
+import '../../../core/widgets/sanrio_background.dart';
 import '../../../services/providers.dart';
 import '../../habits/domain/check_record.dart';
 import '../../habits/domain/habit.dart';
@@ -96,158 +99,165 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
         ],
       ),
       body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _loadData,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-            children: [
-              _StatsRow(
-                currentStreak: currentStreak,
-                totalCheckIns: totalCheckIns,
-                activeDays: _recordsByDate.length,
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  child: TableCalendar<CheckRecord>(
-                    firstDay: DateTime(2024, 1, 1),
-                    lastDay: DateTime(2030, 12, 31),
-                    focusedDay: focusedDay,
-                    selectedDayPredicate: (day) => isSameDay(day, selectedDay),
-                    calendarFormat: calendarFormat,
-                    availableCalendarFormats: const {
-                      CalendarFormat.month: '\u6708',
-                      CalendarFormat.twoWeeks: '\u4e24\u5468',
-                      CalendarFormat.week: '\u5468',
-                    },
-                    eventLoader: (day) =>
-                        _recordsByDate[selectedDayKey(day)] ?? const [],
-                    onFormatChanged: (format) {
-                      ref.read(calendarFormatProvider.notifier).state = format;
-                    },
-                    onDaySelected: (selected, focused) {
-                      if (!app_date.DateUtils.isValidDate(
-                          selected.year, selected.month, selected.day)) {
-                        return;
-                      }
-                      if (!isSameDay(selected, selectedDay)) {
-                        ref.read(selectedDayProvider.notifier).state = selected;
-                      }
-                      ref.read(focusedDayProvider.notifier).state = focused;
-                    },
-                    onPageChanged: (focused) {
-                      ref.read(focusedDayProvider.notifier).state = focused;
-                    },
-                    daysOfWeekHeight: 34,
-                    rowHeight: 62,
-                    headerStyle: HeaderStyle(
-                      titleCentered: true,
-                      formatButtonDecoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primary
-                            .withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      formatButtonTextStyle: TextStyle(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontWeight: FontWeight.w800,
-                      ),
-                      leftChevronIcon: const Icon(Icons.chevron_left_rounded),
-                      rightChevronIcon: const Icon(Icons.chevron_right_rounded),
-                      titleTextStyle: Theme.of(context).textTheme.titleMedium!,
-                    ),
-                    calendarStyle: CalendarStyle(
-                      outsideDaysVisible: false,
-                      defaultDecoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      weekendTextStyle:
-                          const TextStyle(color: AppColors.secondaryColor),
-                      selectedDecoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primary,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      todayDecoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primary
-                            .withValues(alpha: 0.16),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      markerDecoration: const BoxDecoration(
-                        color: AppColors.successColor,
-                        shape: BoxShape.circle,
-                      ),
-                      markersMaxCount: 3,
-                    ),
-                    calendarBuilders: CalendarBuilders(
-                      markerBuilder: (context, day, events) {
-                        if (events.isEmpty) {
-                          return null;
+        child: SanrioBackground(
+          child: RefreshIndicator(
+            onRefresh: _loadData,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              children: [
+                _StatsRow(
+                  currentStreak: currentStreak,
+                  totalCheckIns: totalCheckIns,
+                  activeDays: _recordsByDate.length,
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    child: TableCalendar<CheckRecord>(
+                      firstDay: DateTime(2024, 1, 1),
+                      lastDay: DateTime(2030, 12, 31),
+                      focusedDay: focusedDay,
+                      selectedDayPredicate: (day) =>
+                          isSameDay(day, selectedDay),
+                      calendarFormat: calendarFormat,
+                      availableCalendarFormats: const {
+                        CalendarFormat.month: '\u6708',
+                        CalendarFormat.twoWeeks: '\u4e24\u5468',
+                        CalendarFormat.week: '\u5468',
+                      },
+                      eventLoader: (day) =>
+                          _recordsByDate[selectedDayKey(day)] ?? const [],
+                      onFormatChanged: (format) {
+                        ref.read(calendarFormatProvider.notifier).state =
+                            format;
+                      },
+                      onDaySelected: (selected, focused) {
+                        if (!app_date.DateUtils.isValidDate(
+                            selected.year, selected.month, selected.day)) {
+                          return;
                         }
-                        return Positioned(
-                          bottom: 6,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: List.generate(
-                              events.length.clamp(0, 3),
-                              (index) => Container(
-                                width: 5,
-                                height: 5,
-                                margin:
-                                    const EdgeInsets.symmetric(horizontal: 1),
-                                decoration: const BoxDecoration(
-                                  color: AppColors.successColor,
-                                  shape: BoxShape.circle,
+                        if (!isSameDay(selected, selectedDay)) {
+                          ref.read(selectedDayProvider.notifier).state =
+                              selected;
+                        }
+                        ref.read(focusedDayProvider.notifier).state = focused;
+                      },
+                      onPageChanged: (focused) {
+                        ref.read(focusedDayProvider.notifier).state = focused;
+                      },
+                      daysOfWeekHeight: 34,
+                      rowHeight: 62,
+                      headerStyle: HeaderStyle(
+                        titleCentered: true,
+                        formatButtonDecoration: BoxDecoration(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        formatButtonTextStyle: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w800,
+                        ),
+                        leftChevronIcon: const Icon(Icons.chevron_left_rounded),
+                        rightChevronIcon:
+                            const Icon(Icons.chevron_right_rounded),
+                        titleTextStyle:
+                            Theme.of(context).textTheme.titleMedium!,
+                      ),
+                      calendarStyle: CalendarStyle(
+                        outsideDaysVisible: false,
+                        defaultDecoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        weekendTextStyle:
+                            const TextStyle(color: AppColors.secondaryColor),
+                        selectedDecoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        todayDecoration: BoxDecoration(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        markerDecoration: const BoxDecoration(
+                          color: AppColors.successColor,
+                          shape: BoxShape.circle,
+                        ),
+                        markersMaxCount: 3,
+                      ),
+                      calendarBuilders: CalendarBuilders(
+                        markerBuilder: (context, day, events) {
+                          if (events.isEmpty) {
+                            return null;
+                          }
+                          return Positioned(
+                            bottom: 6,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: List.generate(
+                                events.length.clamp(0, 3),
+                                (index) => Container(
+                                  width: 5,
+                                  height: 5,
+                                  margin:
+                                      const EdgeInsets.symmetric(horizontal: 1),
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.successColor,
+                                    shape: BoxShape.circle,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        );
-                      },
-                      selectedBuilder: (context, day, focusedDay) =>
-                          _buildHolidayCell(
-                        context,
-                        day,
-                        selected: true,
-                        today: false,
-                      ),
-                      todayBuilder: (context, day, focusedDay) =>
-                          _buildHolidayCell(
-                        context,
-                        day,
-                        selected: false,
-                        today: true,
-                      ),
-                      defaultBuilder: (context, day, focusedDay) =>
-                          _buildHolidayCell(
-                        context,
-                        day,
-                        selected: false,
-                        today: false,
+                          );
+                        },
+                        selectedBuilder: (context, day, focusedDay) =>
+                            _buildHolidayCell(
+                          context,
+                          day,
+                          selected: true,
+                          today: false,
+                        ),
+                        todayBuilder: (context, day, focusedDay) =>
+                            _buildHolidayCell(
+                          context,
+                          day,
+                          selected: false,
+                          today: true,
+                        ),
+                        defaultBuilder: (context, day, focusedDay) =>
+                            _buildHolidayCell(
+                          context,
+                          day,
+                          selected: false,
+                          today: false,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              _SelectedDayHeader(
-                selectedDay: selectedDay,
-                count: records.length,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              _isLoading
-                  ? const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 32),
-                      child: Center(child: CircularProgressIndicator()),
-                    )
-                  : _SelectedDayRecords(
-                      records: records,
-                      habitsAsync: ref.watch(habitsProvider),
-                    ),
-            ],
+                const SizedBox(height: AppSpacing.lg),
+                _SelectedDayHeader(
+                  selectedDay: selectedDay,
+                  count: records.length,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                _isLoading
+                    ? const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 32),
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    : _SelectedDayRecords(
+                        records: records,
+                        habitsAsync: ref.watch(habitsProvider),
+                      ),
+              ],
+            ),
           ),
         ),
       ),
@@ -589,6 +599,27 @@ class _RecordCard extends StatelessWidget {
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ],
+              ),
+            ],
+            if (record.imagePath != null && record.imagePath!.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.md),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Image.file(
+                  File(record.imagePath!),
+                  height: 120,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    height: 88,
+                    alignment: Alignment.center,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .primary
+                        .withValues(alpha: 0.08),
+                    child: const Text('图片加载失败'),
+                  ),
+                ),
               ),
             ],
           ],

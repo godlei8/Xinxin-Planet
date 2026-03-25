@@ -7,6 +7,7 @@ import '../../../core/config/feature_flags.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/widgets/sanrio_background.dart';
 import '../../../services/providers.dart';
 import '../../../services/notification_service.dart';
 import '../domain/focus_forest_entry.dart';
@@ -211,135 +212,139 @@ class FocusPage extends ConsumerWidget {
         title: const Text(AppStrings.focusTab),
       ),
       body: SafeArea(
-        child: ListView(
-          padding:
-              EdgeInsets.fromLTRB(16, compact ? 6 : 8, 16, compact ? 16 : 24),
-          children: [
-            Container(
-              padding: EdgeInsets.all(heroPadding),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Theme.of(context)
-                        .colorScheme
-                        .primary
-                        .withValues(alpha: 0.95),
-                    AppColors.secondaryColor.withValues(alpha: 0.9),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+        child: SanrioBackground(
+          child: ListView(
+            padding:
+                EdgeInsets.fromLTRB(16, compact ? 6 : 8, 16, compact ? 16 : 24),
+            children: [
+              Container(
+                padding: EdgeInsets.all(heroPadding),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Theme.of(context)
+                          .colorScheme
+                          .primary
+                          .withValues(alpha: 0.95),
+                      AppColors.secondaryColor.withValues(alpha: 0.9),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(28),
                 ),
-                borderRadius: BorderRadius.circular(28),
-              ),
-              child: Column(
-                children: [
-                  SizedBox(
-                    width: timerSize,
-                    height: timerSize,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        SizedBox(
-                          width: ringSize,
-                          height: ringSize,
-                          child: CircularProgressIndicator(
-                            value: timer.progress,
-                            strokeWidth: 12,
-                            backgroundColor:
-                                Colors.white.withValues(alpha: 0.18),
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              _progressColor(timer.state),
+                child: Column(
+                  children: [
+                    SizedBox(
+                      width: timerSize,
+                      height: timerSize,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          SizedBox(
+                            width: ringSize,
+                            height: ringSize,
+                            child: CircularProgressIndicator(
+                              value: timer.progress,
+                              strokeWidth: 12,
+                              backgroundColor:
+                                  Colors.white.withValues(alpha: 0.18),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                _progressColor(timer.state),
+                              ),
                             ),
                           ),
-                        ),
-                        Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              timer.displayTime,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .headlineLarge
-                                  ?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: timeFontSize,
-                                  ),
-                            ),
-                            SizedBox(height: compact ? 6 : 10),
-                            Text(
-                              _stateText(timer.state),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(
-                                    color: Colors.white.withValues(alpha: 0.94),
-                                  ),
-                            ),
-                          ],
-                        ),
-                      ],
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                timer.displayTime,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineLarge
+                                    ?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: timeFontSize,
+                                    ),
+                              ),
+                              SizedBox(height: compact ? 6 : 10),
+                              Text(
+                                _stateText(timer.state),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.94),
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  Text(
-                    '给自己一小段安静时间，完成一件最重要的事。',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.92),
-                        ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: sectionSpacing),
-            if (FeatureFlags.enableFocusForest) ...[
-              _FocusForestPanel(forestAsync: forestAsync),
-              SizedBox(height: sectionSpacing),
-            ],
-            Card(
-              child: Padding(
-                padding: EdgeInsets.all(cardPadding),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('专注时长', style: Theme.of(context).textTheme.titleLarge),
-                    const SizedBox(height: AppSpacing.sm),
                     Text(
-                      timer.state == FocusTimerState.idle
-                          ? '先选一个舒服的长度，再开始这一轮专注。'
-                          : '计时开始后，会按当前状态自动切换按钮。',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    Wrap(
-                      spacing: AppSpacing.sm,
-                      runSpacing: AppSpacing.sm,
-                      children: [5, 15, 25, 45, 60].map((minutes) {
-                        final isSelected = timer.selectedMinutes == minutes;
-                        return ChoiceChip(
-                          label: Text('$minutes 分钟'),
-                          selected: isSelected,
-                          onSelected: timer.state == FocusTimerState.idle
-                              ? (_) => notifier.setDuration(minutes)
-                              : null,
-                        );
-                      }).toList(),
+                      '给自己一小段安静时间，完成一件最重要的事。',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.92),
+                          ),
                     ),
                   ],
                 ),
               ),
-            ),
-            SizedBox(height: sectionSpacing),
-            Card(
-              child: Padding(
-                padding: EdgeInsets.all(cardPadding),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: _buildButtons(context, notifier, timer),
+              SizedBox(height: sectionSpacing),
+              if (FeatureFlags.enableFocusForest) ...[
+                _FocusForestPanel(forestAsync: forestAsync),
+                SizedBox(height: sectionSpacing),
+              ],
+              Card(
+                child: Padding(
+                  padding: EdgeInsets.all(cardPadding),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('专注时长',
+                          style: Theme.of(context).textTheme.titleLarge),
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(
+                        timer.state == FocusTimerState.idle
+                            ? '先选一个舒服的长度，再开始这一轮专注。'
+                            : '计时开始后，会按当前状态自动切换按钮。',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      Wrap(
+                        spacing: AppSpacing.sm,
+                        runSpacing: AppSpacing.sm,
+                        children: [5, 15, 25, 45, 60].map((minutes) {
+                          final isSelected = timer.selectedMinutes == minutes;
+                          return ChoiceChip(
+                            label: Text('$minutes 分钟'),
+                            selected: isSelected,
+                            onSelected: timer.state == FocusTimerState.idle
+                                ? (_) => notifier.setDuration(minutes)
+                                : null,
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+              SizedBox(height: sectionSpacing),
+              Card(
+                child: Padding(
+                  padding: EdgeInsets.all(cardPadding),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: _buildButtons(context, notifier, timer),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

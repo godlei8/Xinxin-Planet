@@ -19,6 +19,9 @@ import '../features/home/data/daily_quote_service.dart';
 import '../features/home/data/user_progress_repository.dart';
 import '../features/home/domain/habit_suggestion.dart';
 import '../features/home/domain/user_progress.dart';
+import '../features/planet/data/gacha_repository.dart';
+import '../features/planet/data/sleep_mode_repository.dart';
+import '../features/planet/data/supervision_repository.dart';
 import '../features/settings/data/health_reminder_repository.dart';
 import '../features/settings/domain/health_reminder.dart';
 
@@ -38,6 +41,10 @@ final focusForestRepositoryProvider =
     Provider((ref) => FocusForestRepository());
 final healthReminderRepositoryProvider =
     Provider((ref) => HealthReminderRepository());
+final gachaRepositoryProvider = Provider((ref) => GachaRepository());
+final supervisionRepositoryProvider =
+    Provider((ref) => SupervisionRepository());
+final sleepModeRepositoryProvider = Provider((ref) => SleepModeRepository());
 final achievementServiceProvider = Provider((ref) => AchievementService(
       achievementRepository: ref.watch(achievementRepositoryProvider),
       userProgressRepository: ref.watch(userProgressRepositoryProvider),
@@ -203,6 +210,14 @@ final habitStreakProvider =
 final dailyQuoteProvider = FutureProvider<DailyQuote>((ref) async {
   final service = ref.watch(dailyQuoteServiceProvider);
   return service.fetchTodayQuote();
+});
+
+final walletCoinsProvider = FutureProvider<int>((ref) async {
+  if (!FeatureFlags.enableGachaSystem) {
+    return 0;
+  }
+  final repository = ref.watch(gachaRepositoryProvider);
+  return repository.getCoins();
 });
 
 final habitSuggestionsProvider = FutureProvider<List<HabitSuggestion>>((ref) {

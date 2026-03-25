@@ -414,10 +414,10 @@ class NotificationService {
     if (intervalMinutes <= 1) {
       return RepeatInterval.everyMinute;
     }
-    if (intervalMinutes <= 60) {
+    if (intervalMinutes <= 120) {
       return RepeatInterval.hourly;
     }
-    if (intervalMinutes <= 1440) {
+    if (intervalMinutes <= 2880) {
       return RepeatInterval.daily;
     }
     return RepeatInterval.weekly;

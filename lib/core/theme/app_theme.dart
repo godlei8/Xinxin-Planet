@@ -11,15 +11,19 @@ class AppTheme {
       displayColor: AppColors.textPrimary,
     );
 
+    final textTheme = _kawaiiTextTheme(baseTextTheme, isDark: false);
     final colorScheme = ColorScheme.fromSeed(
       seedColor: primaryColor,
       brightness: Brightness.light,
     ).copyWith(
       primary: primaryColor,
-      secondary: const Color(0xFF94D6FF),
-      tertiary: const Color(0xFFFFD979),
-      surface: const Color(0xFFFFFDFF),
+      secondary: AppColors.secondaryColor,
+      tertiary: AppColors.accentColor,
       error: AppColors.errorColor,
+      surface: const Color(0xFFFFFFFF),
+      onSurface: AppColors.textPrimary,
+      outline: const Color(0xFFFFC7DD),
+      outlineVariant: const Color(0xFFFFE4F0),
     );
 
     return ThemeData(
@@ -27,17 +31,17 @@ class AppTheme {
       brightness: Brightness.light,
       colorScheme: colorScheme,
       primaryColor: primaryColor,
-      scaffoldBackgroundColor: const Color(0xFFFFF7FB),
+      scaffoldBackgroundColor: AppColors.backgroundColor,
       splashColor: primaryColor.withValues(alpha: 0.08),
       highlightColor: primaryColor.withValues(alpha: 0.04),
-      textTheme: _textTheme(baseTextTheme),
+      textTheme: textTheme,
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         foregroundColor: AppColors.textPrimary,
+        centerTitle: true,
         elevation: 0,
         scrolledUnderElevation: 0,
-        centerTitle: true,
-        titleTextStyle: baseTextTheme.titleLarge?.copyWith(
+        titleTextStyle: textTheme.titleLarge?.copyWith(
           fontWeight: FontWeight.w900,
           color: AppColors.textPrimary,
         ),
@@ -47,20 +51,20 @@ class AppTheme {
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(28),
-          side: const BorderSide(color: Color(0xFFFFE3F2)),
+          borderRadius: BorderRadius.circular(30),
+          side: const BorderSide(color: Color(0xFFFFD5E7), width: 1.2),
         ),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: const Color(0xFFFFF0F7),
-        contentTextStyle: baseTextTheme.bodyMedium?.copyWith(
-          color: const Color(0xFF75476A),
+        backgroundColor: const Color(0xFFFFEFF7),
+        contentTextStyle: textTheme.bodyMedium?.copyWith(
+          color: const Color(0xFF713F60),
           fontWeight: FontWeight.w700,
         ),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(22),
-          side: const BorderSide(color: Color(0xFFFFD6EA)),
+          borderRadius: BorderRadius.circular(18),
+          side: const BorderSide(color: Color(0xFFFFD5E7)),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -71,27 +75,31 @@ class AppTheme {
           shadowColor: Colors.transparent,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(999),
+            side: BorderSide(color: Colors.white.withValues(alpha: 0.18)),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          textStyle:
-              baseTextTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          textStyle: textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.textPrimary,
-          side: const BorderSide(color: Color(0xFFFFD4E9)),
+          side: const BorderSide(color: Color(0xFFFFCDE4), width: 1.2),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(999),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          textStyle:
+              textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
         ),
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: const Color(0xFFFFF2FA),
+        backgroundColor: const Color(0xFFFFF0F8),
         selectedColor: primaryColor.withValues(alpha: 0.2),
-        labelStyle: baseTextTheme.labelLarge!,
-        secondaryLabelStyle: baseTextTheme.labelLarge!,
+        labelStyle: textTheme.labelLarge!,
+        secondaryLabelStyle: textTheme.labelLarge!,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
         side: BorderSide.none,
@@ -104,34 +112,33 @@ class AppTheme {
           vertical: AppSpacing.md,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(color: Color(0xFFFFDCEF)),
+          borderRadius: BorderRadius.circular(20),
+          borderSide: const BorderSide(color: Color(0xFFFFD5E7)),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(color: Color(0xFFFFDCEF)),
+          borderRadius: BorderRadius.circular(20),
+          borderSide: const BorderSide(color: Color(0xFFFFD5E7)),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(20),
           borderSide: BorderSide(color: primaryColor, width: 1.8),
         ),
-        hintStyle:
-            baseTextTheme.bodyMedium?.copyWith(color: AppColors.textHint),
+        hintStyle: textTheme.bodyMedium?.copyWith(color: AppColors.textHint),
         labelStyle:
-            baseTextTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+            textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
       ),
       dividerTheme: const DividerThemeData(
-        color: Color(0xFFFFE7F4),
+        color: Color(0xFFFFE4F0),
         thickness: 1,
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
         elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: const Color(0xFFFFFBFF),
+        backgroundColor: const Color(0xFFFFFBFE),
         height: 74,
         indicatorColor: primaryColor.withValues(alpha: 0.18),
         iconTheme: WidgetStateProperty.resolveWith((states) {
@@ -142,7 +149,7 @@ class AppTheme {
           );
         }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
-          return baseTextTheme.labelMedium!.copyWith(
+          return textTheme.labelMedium!.copyWith(
             fontWeight: states.contains(WidgetState.selected)
                 ? FontWeight.w900
                 : FontWeight.w600,
@@ -172,19 +179,23 @@ class AppTheme {
 
   static ThemeData darkTheme({Color primaryColor = AppColors.primaryColor}) {
     final baseTextTheme = GoogleFonts.notoSansScTextTheme().apply(
-      bodyColor: const Color(0xFFF6EEF4),
-      displayColor: const Color(0xFFF6EEF4),
+      bodyColor: const Color(0xFFF8EEF5),
+      displayColor: const Color(0xFFF8EEF5),
     );
 
+    final textTheme = _kawaiiTextTheme(baseTextTheme, isDark: true);
     final colorScheme = ColorScheme.fromSeed(
       seedColor: primaryColor,
       brightness: Brightness.dark,
     ).copyWith(
       primary: primaryColor,
-      secondary: const Color(0xFF8AC7F0),
-      tertiary: const Color(0xFFE9BF69),
-      surface: const Color(0xFF251D2D),
+      secondary: const Color(0xFF9BD3F4),
+      tertiary: const Color(0xFFF1CD78),
       error: AppColors.errorColor,
+      surface: const Color(0xFF251A2B),
+      onSurface: const Color(0xFFF8EEF5),
+      outline: const Color(0xFF4A3449),
+      outlineVariant: const Color(0xFF382B3B),
     );
 
     return ThemeData(
@@ -192,35 +203,38 @@ class AppTheme {
       brightness: Brightness.dark,
       colorScheme: colorScheme,
       primaryColor: primaryColor,
-      scaffoldBackgroundColor: const Color(0xFF161219),
-      textTheme: _textTheme(baseTextTheme),
+      scaffoldBackgroundColor: const Color(0xFF19121E),
+      textTheme: textTheme,
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
-        foregroundColor: const Color(0xFFF6EEF4),
-        elevation: 0,
+        foregroundColor: const Color(0xFFF8EEF5),
         centerTitle: true,
-        titleTextStyle: baseTextTheme.titleLarge?.copyWith(
-          fontWeight: FontWeight.w800,
-          color: const Color(0xFFF6EEF4),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        titleTextStyle: textTheme.titleLarge?.copyWith(
+          fontWeight: FontWeight.w900,
+          color: const Color(0xFFF8EEF5),
         ),
       ),
       cardTheme: CardThemeData(
-        color: const Color(0xFF251D2D),
+        color: const Color(0xFF261B2D),
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(28),
-          side: const BorderSide(color: Color(0xFF3B3144)),
+          borderRadius: BorderRadius.circular(30),
+          side: const BorderSide(color: Color(0xFF3F3044), width: 1.2),
         ),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: const Color(0xFF31263B),
-        contentTextStyle:
-            baseTextTheme.bodyMedium?.copyWith(color: const Color(0xFFFFEAF6)),
+        backgroundColor: const Color(0xFF302334),
+        contentTextStyle: textTheme.bodyMedium?.copyWith(
+          color: const Color(0xFFFFEAF6),
+          fontWeight: FontWeight.w700,
+        ),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(22),
-          side: const BorderSide(color: Color(0xFF493A55)),
+          borderRadius: BorderRadius.circular(18),
+          side: const BorderSide(color: Color(0xFF46374A)),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -228,19 +242,18 @@ class AppTheme {
           backgroundColor: primaryColor,
           foregroundColor: Colors.white,
           elevation: 0,
-          shadowColor: Colors.transparent,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(999),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           textStyle:
-              baseTextTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: const Color(0xFFF6EEF4),
-          side: const BorderSide(color: Color(0xFF3A313F)),
+          foregroundColor: const Color(0xFFF8EEF5),
+          side: const BorderSide(color: Color(0xFF46394A)),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(999),
           ),
@@ -248,10 +261,10 @@ class AppTheme {
         ),
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: const Color(0xFF2C2433),
+        backgroundColor: const Color(0xFF2E2434),
         selectedColor: primaryColor.withValues(alpha: 0.25),
-        labelStyle: baseTextTheme.labelLarge!,
-        secondaryLabelStyle: baseTextTheme.labelLarge!,
+        labelStyle: textTheme.labelLarge!,
+        secondaryLabelStyle: textTheme.labelLarge!,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
         side: BorderSide.none,
@@ -264,51 +277,47 @@ class AppTheme {
           vertical: AppSpacing.md,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(color: Color(0xFF352C3A)),
+          borderRadius: BorderRadius.circular(20),
+          borderSide: const BorderSide(color: Color(0xFF3C2F42)),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(color: Color(0xFF352C3A)),
+          borderRadius: BorderRadius.circular(20),
+          borderSide: const BorderSide(color: Color(0xFF3C2F42)),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(20),
           borderSide: BorderSide(color: primaryColor, width: 1.8),
         ),
-        hintStyle:
-            baseTextTheme.bodyMedium?.copyWith(color: const Color(0xFFA99FB0)),
-        labelStyle:
-            baseTextTheme.bodyMedium?.copyWith(color: const Color(0xFFA99FB0)),
       ),
       dividerTheme: const DividerThemeData(
-        color: Color(0xFF302733),
+        color: Color(0xFF312735),
         thickness: 1,
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
         elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: const Color(0xFF1D1722),
+        backgroundColor: const Color(0xFF1F1725),
         height: 72,
         indicatorColor: primaryColor.withValues(alpha: 0.22),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           return IconThemeData(
             color: states.contains(WidgetState.selected)
                 ? primaryColor
-                : const Color(0xFFA99FB0),
+                : const Color(0xFFAFA0B8),
           );
         }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
-          return baseTextTheme.labelMedium!.copyWith(
+          return textTheme.labelMedium!.copyWith(
             fontWeight: states.contains(WidgetState.selected)
-                ? FontWeight.w800
+                ? FontWeight.w900
                 : FontWeight.w600,
             color: states.contains(WidgetState.selected)
                 ? primaryColor
-                : const Color(0xFFA99FB0),
+                : const Color(0xFFAFA0B8),
           );
         }),
       ),
@@ -330,19 +339,40 @@ class AppTheme {
     );
   }
 
-  static TextTheme _textTheme(TextTheme base) {
+  static TextTheme _kawaiiTextTheme(TextTheme base, {required bool isDark}) {
+    final titleColor = isDark ? const Color(0xFFF8EEF5) : AppColors.textPrimary;
     return base.copyWith(
-      headlineLarge: base.headlineLarge
-          ?.copyWith(fontWeight: FontWeight.w900, fontSize: 30, height: 1.2),
-      headlineMedium: base.headlineMedium
-          ?.copyWith(fontWeight: FontWeight.w800, fontSize: 24, height: 1.24),
-      titleLarge:
-          base.titleLarge?.copyWith(fontWeight: FontWeight.w800, fontSize: 20),
-      titleMedium:
-          base.titleMedium?.copyWith(fontWeight: FontWeight.w700, fontSize: 16),
-      bodyLarge: base.bodyLarge?.copyWith(fontSize: 16, height: 1.3),
-      bodyMedium: base.bodyMedium?.copyWith(fontSize: 14, height: 1.4),
-      labelLarge: base.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+      headlineLarge: GoogleFonts.zcoolKuaiLe(
+        fontSize: 34,
+        height: 1.18,
+        fontWeight: FontWeight.w700,
+        color: titleColor,
+      ),
+      headlineMedium: GoogleFonts.zcoolKuaiLe(
+        fontSize: 28,
+        height: 1.22,
+        fontWeight: FontWeight.w700,
+        color: titleColor,
+      ),
+      titleLarge: GoogleFonts.zcoolKuaiLe(
+        fontSize: 22,
+        fontWeight: FontWeight.w700,
+        color: titleColor,
+      ),
+      titleMedium: base.titleMedium?.copyWith(
+        fontWeight: FontWeight.w800,
+        fontSize: 16,
+      ),
+      bodyLarge: base.bodyLarge?.copyWith(fontSize: 16, height: 1.35),
+      bodyMedium: base.bodyMedium?.copyWith(fontSize: 14, height: 1.42),
+      bodySmall: base.bodySmall?.copyWith(fontSize: 12.5, height: 1.38),
+      labelLarge: base.labelLarge?.copyWith(
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.15,
+      ),
+      labelMedium: base.labelMedium?.copyWith(
+        fontWeight: FontWeight.w700,
+      ),
     );
   }
 }

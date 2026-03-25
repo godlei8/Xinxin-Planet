@@ -6,6 +6,7 @@ import '../../../core/config/feature_flags.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/widgets/sanrio_background.dart';
 import '../../../services/notification_service.dart';
 import '../../../services/providers.dart';
 import '../domain/category.dart';
@@ -83,247 +84,252 @@ class _AddEditHabitPageState extends ConsumerState<AddEditHabitPage> {
         ],
       ),
       body: SafeArea(
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-            children: [
-              _SectionCard(
-                title: '给这颗小星球起个名字',
-                child: Column(
-                  children: [
-                    TextFormField(
-                      controller: _nameController,
-                      textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(
-                        labelText: AppStrings.habitName,
-                        hintText: '比如：喝水、背单词、早睡 15 分钟',
+        child: SanrioBackground(
+          child: Form(
+            key: _formKey,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              children: [
+                _SectionCard(
+                  title: '给这颗小星球起个名字',
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        controller: _nameController,
+                        textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(
+                          labelText: AppStrings.habitName,
+                          hintText: '比如：喝水、背单词、早睡 15 分钟',
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return '请输入习惯名称';
+                          }
+                          return null;
+                        },
                       ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return '请输入习惯名称';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    TextFormField(
-                      controller: _descriptionController,
-                      maxLines: 2,
-                      decoration: const InputDecoration(
-                        labelText: AppStrings.habitDescription,
-                        hintText: '留一句温柔提醒，会更容易坚持。',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              _SectionCard(
-                title: '外观',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(AppStrings.selectIcon,
-                        style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: AppSpacing.sm),
-                    Wrap(
-                      spacing: AppSpacing.sm,
-                      runSpacing: AppSpacing.sm,
-                      children: AppStrings.habitIcons.map((icon) {
-                        final isSelected = icon == _selectedIconCode;
-                        return GestureDetector(
-                          onTap: () => setState(() => _selectedIconCode = icon),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? selectedColor.withValues(alpha: 0.18)
-                                  : Theme.of(context).colorScheme.surface,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: isSelected
-                                    ? selectedColor
-                                    : Colors.transparent,
-                                width: 1.8,
-                              ),
-                            ),
-                            child: Center(
-                                child: Text(icon,
-                                    style: const TextStyle(fontSize: 24))),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    Text(AppStrings.selectColor,
-                        style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: AppSpacing.sm),
-                    Wrap(
-                      spacing: AppSpacing.sm,
-                      runSpacing: AppSpacing.sm,
-                      children: AppColors.themeColorCodes.map((colorCode) {
-                        final color = AppColors.fromHex(colorCode);
-                        final isSelected = colorCode == _selectedColorCode;
-                        return GestureDetector(
-                          onTap: () =>
-                              setState(() => _selectedColorCode = colorCode),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: color,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isSelected
-                                    ? Colors.white
-                                    : Colors.transparent,
-                                width: 3,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: color.withValues(
-                                      alpha: isSelected ? 0.45 : 0.18),
-                                  blurRadius: isSelected ? 14 : 8,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ],
-                            ),
-                            child: isSelected
-                                ? const Icon(Icons.check_rounded,
-                                    color: Colors.white, size: 20)
-                                : null,
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              _SectionCard(
-                title: '分类与重复',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    categoriesAsync.when(
-                      data: _buildCategorySelector,
-                      loading: () => const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 24),
-                        child: Center(child: CircularProgressIndicator()),
-                      ),
-                      error: (error, _) => Text('分类加载失败：$error'),
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    Text(AppStrings.selectFrequency,
-                        style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: AppSpacing.sm),
-                    Wrap(
-                      spacing: AppSpacing.sm,
-                      runSpacing: AppSpacing.sm,
-                      children: [
-                        _FrequencyChip(
-                          label: AppStrings.frequencyDaily,
-                          selected: _selectedFrequency == 0,
-                          onTap: () => setState(() => _selectedFrequency = 0),
-                        ),
-                        _FrequencyChip(
-                          label: AppStrings.frequencyWeekdays,
-                          selected: _selectedFrequency == 1,
-                          onTap: () => setState(() => _selectedFrequency = 1),
-                        ),
-                        _FrequencyChip(
-                          label: AppStrings.frequencyWeekends,
-                          selected: _selectedFrequency == 2,
-                          onTap: () => setState(() => _selectedFrequency = 2),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              _SectionCard(
-                title: '提醒',
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                AppStrings.enableReminder,
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                _reminderEnabled
-                                    ? '会在固定时间轻轻提醒你'
-                                    : '不开启也没关系，先把习惯种下来',
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
-                            ],
-                          ),
-                        ),
-                        Switch.adaptive(
-                          value: _reminderEnabled,
-                          onChanged: (value) =>
-                              setState(() => _reminderEnabled = value),
-                        ),
-                      ],
-                    ),
-                    if (_reminderEnabled) ...[
                       const SizedBox(height: AppSpacing.md),
-                      InkWell(
-                        onTap: _pickReminderTime,
-                        borderRadius: BorderRadius.circular(16),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 14),
-                          decoration: BoxDecoration(
-                            color: selectedColor.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.alarm_rounded, color: selectedColor),
-                              const SizedBox(width: AppSpacing.md),
-                              Expanded(
-                                child: Text(
-                                  _reminderTime == null
-                                      ? '选择提醒时间'
-                                      : '每天 ${_reminderTime!.format(context)} 提醒',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleMedium
-                                      ?.copyWith(
-                                        color: selectedColor,
-                                      ),
-                                ),
-                              ),
-                              const Icon(Icons.chevron_right_rounded),
-                            ],
-                          ),
+                      TextFormField(
+                        controller: _descriptionController,
+                        maxLines: 2,
+                        decoration: const InputDecoration(
+                          labelText: AppStrings.habitDescription,
+                          hintText: '留一句温柔提醒，会更容易坚持。',
                         ),
                       ),
                     ],
-                  ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              ElevatedButton(
-                onPressed: _isSaving ? null : _saveHabit,
-                style: ElevatedButton.styleFrom(backgroundColor: selectedColor),
-                child: Text(_isSaving
-                    ? '保存中...'
-                    : (_isEditing ? AppStrings.save : AppStrings.addHabit)),
-              ),
-            ],
+                const SizedBox(height: AppSpacing.lg),
+                _SectionCard(
+                  title: '外观',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(AppStrings.selectIcon,
+                          style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: AppSpacing.sm),
+                      Wrap(
+                        spacing: AppSpacing.sm,
+                        runSpacing: AppSpacing.sm,
+                        children: AppStrings.habitIcons.map((icon) {
+                          final isSelected = icon == _selectedIconCode;
+                          return GestureDetector(
+                            onTap: () =>
+                                setState(() => _selectedIconCode = icon),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? selectedColor.withValues(alpha: 0.18)
+                                    : Theme.of(context).colorScheme.surface,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? selectedColor
+                                      : Colors.transparent,
+                                  width: 1.8,
+                                ),
+                              ),
+                              child: Center(
+                                  child: Text(icon,
+                                      style: const TextStyle(fontSize: 24))),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      Text(AppStrings.selectColor,
+                          style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: AppSpacing.sm),
+                      Wrap(
+                        spacing: AppSpacing.sm,
+                        runSpacing: AppSpacing.sm,
+                        children: AppColors.themeColorCodes.map((colorCode) {
+                          final color = AppColors.fromHex(colorCode);
+                          final isSelected = colorCode == _selectedColorCode;
+                          return GestureDetector(
+                            onTap: () =>
+                                setState(() => _selectedColorCode = colorCode),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: color,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isSelected
+                                      ? Colors.white
+                                      : Colors.transparent,
+                                  width: 3,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: color.withValues(
+                                        alpha: isSelected ? 0.45 : 0.18),
+                                    blurRadius: isSelected ? 14 : 8,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                ],
+                              ),
+                              child: isSelected
+                                  ? const Icon(Icons.check_rounded,
+                                      color: Colors.white, size: 20)
+                                  : null,
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                _SectionCard(
+                  title: '分类与重复',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      categoriesAsync.when(
+                        data: _buildCategorySelector,
+                        loading: () => const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
+                        error: (error, _) => Text('分类加载失败：$error'),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      Text(AppStrings.selectFrequency,
+                          style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: AppSpacing.sm),
+                      Wrap(
+                        spacing: AppSpacing.sm,
+                        runSpacing: AppSpacing.sm,
+                        children: [
+                          _FrequencyChip(
+                            label: AppStrings.frequencyDaily,
+                            selected: _selectedFrequency == 0,
+                            onTap: () => setState(() => _selectedFrequency = 0),
+                          ),
+                          _FrequencyChip(
+                            label: AppStrings.frequencyWeekdays,
+                            selected: _selectedFrequency == 1,
+                            onTap: () => setState(() => _selectedFrequency = 1),
+                          ),
+                          _FrequencyChip(
+                            label: AppStrings.frequencyWeekends,
+                            selected: _selectedFrequency == 2,
+                            onTap: () => setState(() => _selectedFrequency = 2),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                _SectionCard(
+                  title: '提醒',
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  AppStrings.enableReminder,
+                                  style:
+                                      Theme.of(context).textTheme.titleMedium,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _reminderEnabled
+                                      ? '会在固定时间轻轻提醒你'
+                                      : '不开启也没关系，先把习惯种下来',
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                              ],
+                            ),
+                          ),
+                          Switch.adaptive(
+                            value: _reminderEnabled,
+                            onChanged: (value) =>
+                                setState(() => _reminderEnabled = value),
+                          ),
+                        ],
+                      ),
+                      if (_reminderEnabled) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        InkWell(
+                          onTap: _pickReminderTime,
+                          borderRadius: BorderRadius.circular(16),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 14),
+                            decoration: BoxDecoration(
+                              color: selectedColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.alarm_rounded, color: selectedColor),
+                                const SizedBox(width: AppSpacing.md),
+                                Expanded(
+                                  child: Text(
+                                    _reminderTime == null
+                                        ? '选择提醒时间'
+                                        : '每天 ${_reminderTime!.format(context)} 提醒',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(
+                                          color: selectedColor,
+                                        ),
+                                  ),
+                                ),
+                                const Icon(Icons.chevron_right_rounded),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                ElevatedButton(
+                  onPressed: _isSaving ? null : _saveHabit,
+                  style:
+                      ElevatedButton.styleFrom(backgroundColor: selectedColor),
+                  child: Text(_isSaving
+                      ? '保存中...'
+                      : (_isEditing ? AppStrings.save : AppStrings.addHabit)),
+                ),
+              ],
+            ),
           ),
         ),
       ),

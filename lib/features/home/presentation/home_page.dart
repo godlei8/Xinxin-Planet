@@ -5,6 +5,7 @@ import '../../../core/config/feature_flags.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/utils/date_utils.dart' as app_date;
+import '../../../core/widgets/sanrio_background.dart';
 import '../../../services/providers.dart';
 import '../../habits/domain/habit.dart';
 import '../../habits/presentation/add_edit_habit_page.dart';
@@ -23,6 +24,7 @@ class HomePage extends ConsumerWidget {
     final progressAsync = ref.watch(userProgressProvider);
     final quoteAsync = ref.watch(dailyQuoteProvider);
     final suggestionsAsync = ref.watch(habitSuggestionsProvider);
+    final coinsAsync = ref.watch(walletCoinsProvider);
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
@@ -30,95 +32,92 @@ class HomePage extends ConsumerWidget {
         icon: const Icon(Icons.favorite_rounded),
         label: const Text(AppStrings.addHabit),
       ),
-      body: Stack(
-        children: [
-          const Positioned.fill(child: _CandyBackdrop()),
-          SafeArea(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 124),
-              children: [
-                progressAsync.when(
-                  data: (progress) => recordsAsync.when(
-                    data: (records) => habitsAsync.when(
-                      data: (habits) => _HeroCard(
-                        progress: progress,
-                        completedCount: records.length,
-                        totalCount: habits.length,
-                        quoteAsync: quoteAsync,
-                      ),
-                      loading: () => const SizedBox.shrink(),
-                      error: (_, __) => const SizedBox.shrink(),
+      body: SafeArea(
+        child: SanrioBackground(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 124),
+            children: [
+              progressAsync.when(
+                data: (progress) => recordsAsync.when(
+                  data: (records) => habitsAsync.when(
+                    data: (habits) => _HeroCard(
+                      progress: progress,
+                      completedCount: records.length,
+                      totalCount: habits.length,
+                      quoteAsync: quoteAsync,
+                      coinsAsync: coinsAsync,
                     ),
                     loading: () => const SizedBox.shrink(),
                     error: (_, __) => const SizedBox.shrink(),
                   ),
-                  loading: () => const SizedBox(
-                    height: 300,
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                  error: (error, _) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 24),
-                    child: Text('Data load failed: $error'),
-                  ),
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, __) => const SizedBox.shrink(),
                 ),
-                const SizedBox(height: AppSpacing.xl),
-                Text(
-                  '今日甜甜任务',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
+                loading: () => const SizedBox(
+                  height: 300,
+                  child: Center(child: CircularProgressIndicator()),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  '把计划拆成一颗颗小星星，慢慢点亮今天的进度。',
-                  style: Theme.of(context).textTheme.bodyMedium,
+                error: (error, _) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Text('Data load failed: $error'),
                 ),
-                if (FeatureFlags.enableHabitSuggestions) ...[
-                  const SizedBox(height: AppSpacing.md),
-                  _SuggestionPanel(suggestionsAsync: suggestionsAsync),
-                ],
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              Text(
+                '今日甜甜任务',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '把计划拆成一颗颗小星星，慢慢点亮今天的进度。',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              if (FeatureFlags.enableHabitSuggestions) ...[
                 const SizedBox(height: AppSpacing.md),
-                habitsAsync.when(
-                  data: (habits) {
-                    if (habits.isEmpty) {
-                      return _EmptyHabitsCard(
-                        onAddPressed: () => _openHabitEditor(context),
-                      );
-                    }
-
-                    return recordsAsync.when(
-                      data: (recordsMap) => Column(
-                        children: habits.map((habit) {
-                          final isCheckedIn = recordsMap.containsKey(habit.id);
-                          return Padding(
-                            padding:
-                                const EdgeInsets.only(bottom: AppSpacing.sm),
-                            child: _HabitCardWithStreak(
-                              habit: habit,
-                              isCheckedIn: isCheckedIn,
-                              onCheckIn: () =>
-                                  _showCheckInSheet(context, ref, habit),
-                              onTap: () =>
-                                  _openHabitEditor(context, habit: habit),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                      loading: () =>
-                          const Center(child: CircularProgressIndicator()),
-                      error: (error, _) => Text('Records load failed: $error'),
-                    );
-                  },
-                  loading: () => const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 32),
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                  error: (error, _) => Text('Habits load failed: $error'),
-                ),
+                _SuggestionPanel(suggestionsAsync: suggestionsAsync),
               ],
-            ),
+              const SizedBox(height: AppSpacing.md),
+              habitsAsync.when(
+                data: (habits) {
+                  if (habits.isEmpty) {
+                    return _EmptyHabitsCard(
+                      onAddPressed: () => _openHabitEditor(context),
+                    );
+                  }
+
+                  return recordsAsync.when(
+                    data: (recordsMap) => Column(
+                      children: habits.map((habit) {
+                        final isCheckedIn = recordsMap.containsKey(habit.id);
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                          child: _HabitCardWithStreak(
+                            habit: habit,
+                            isCheckedIn: isCheckedIn,
+                            onCheckIn: () =>
+                                _showCheckInSheet(context, ref, habit),
+                            onTap: () =>
+                                _openHabitEditor(context, habit: habit),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (error, _) => Text('Records load failed: $error'),
+                  );
+                },
+                loading: () => const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 32),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (error, _) => Text('Habits load failed: $error'),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -149,80 +148,20 @@ class HomePage extends ConsumerWidget {
   }
 }
 
-class _CandyBackdrop extends StatelessWidget {
-  const _CandyBackdrop();
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return IgnorePointer(
-      child: Stack(
-        children: [
-          Positioned(
-            left: -56,
-            top: -34,
-            child: _PastelBlob(
-              size: 180,
-              color: isDark ? const Color(0x335B4B76) : const Color(0x66FFD7EC),
-            ),
-          ),
-          Positioned(
-            right: -28,
-            top: 168,
-            child: _PastelBlob(
-              size: 120,
-              color: isDark ? const Color(0x33406282) : const Color(0x66D7F0FF),
-            ),
-          ),
-          Positioned(
-            left: 14,
-            bottom: 80,
-            child: _PastelBlob(
-              size: 92,
-              color: isDark ? const Color(0x333E6A5D) : const Color(0x66E3F8DE),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PastelBlob extends StatelessWidget {
-  const _PastelBlob({
-    required this.size,
-    required this.color,
-  });
-
-  final double size;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(size * 0.44),
-      ),
-    );
-  }
-}
-
 class _HeroCard extends StatelessWidget {
   const _HeroCard({
     required this.progress,
     required this.completedCount,
     required this.totalCount,
     required this.quoteAsync,
+    required this.coinsAsync,
   });
 
   final UserProgress progress;
   final int completedCount;
   final int totalCount;
   final AsyncValue<DailyQuote> quoteAsync;
+  final AsyncValue<int> coinsAsync;
 
   @override
   Widget build(BuildContext context) {
@@ -290,6 +229,8 @@ class _HeroCard extends StatelessWidget {
                 titleColor: titleColor,
                 subtitleColor: subtitleColor,
               ),
+              const SizedBox(height: 10),
+              _CoinsBadge(coinsAsync: coinsAsync, titleColor: titleColor),
               const SizedBox(height: AppSpacing.md),
               _QuotePanel(
                 quoteAsync: quoteAsync,
@@ -334,6 +275,57 @@ class _HeroCard extends StatelessWidget {
                 isDark: isDark,
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CoinsBadge extends StatelessWidget {
+  const _CoinsBadge({
+    required this.coinsAsync,
+    required this.titleColor,
+  });
+
+  final AsyncValue<int> coinsAsync;
+  final Color titleColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.58),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('💰', style: TextStyle(fontSize: 15)),
+          const SizedBox(width: 6),
+          coinsAsync.when(
+            data: (coins) => Text(
+              '金币 $coins',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: titleColor,
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+            loading: () => Text(
+              '金币 ...',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: titleColor,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            error: (_, __) => Text(
+              '金币 --',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: titleColor,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
           ),
         ],
       ),

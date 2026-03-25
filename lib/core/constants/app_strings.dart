@@ -63,7 +63,7 @@ class AppStrings {
   static const String moodBad = '有点累';
   static const String moodAwful = '不太好';
 
-  static const List<String> moodEmojis = ['😄', '🙂', '😌', '😕', '😣'];
+  static const List<String> moodEmojis = ['😄', '🙂', '😐', '😕', '😣'];
 
   static const List<String> moodLabels = [
     moodHappy,
@@ -74,23 +74,23 @@ class AppStrings {
   ];
 
   static const List<String> habitIcons = [
-    '⭐',
+    '🌸',
     '🌱',
-    '📚',
-    '🏃',
+    '📖',
+    '🎮',
     '💧',
     '🧘',
-    '🎯',
+    '🎵',
     '🎨',
     '📝',
-    '🍎',
-    '🌙',
+    '🍃',
+    '⭐',
     '☀️',
-    '🎵',
-    '🪴',
+    '🎯',
+    '🧠',
     '🔥',
-    '💖',
+    '💎',
     '🏆',
-    '🎈',
+    '🎉',
   ];
 }

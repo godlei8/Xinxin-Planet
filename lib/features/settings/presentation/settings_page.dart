@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
+import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/config/feature_flags.dart';
@@ -8,7 +9,12 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/widgets/app_feedback.dart';
+import '../../../core/widgets/sanrio_background.dart';
 import '../../../features/habits/presentation/achievement_page.dart';
+import '../../../features/planet/presentation/gacha_page.dart';
+import '../../../features/planet/presentation/sleep_mode_page.dart';
+import '../../../features/planet/presentation/supervision_page.dart';
+import '../../../features/planet/presentation/widget_studio_page.dart';
 import '../../../features/settings/domain/health_reminder.dart';
 import '../../../services/backup_service.dart';
 import '../../../services/notification_service.dart';
@@ -89,6 +95,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     ref.invalidate(categoriesProvider);
     ref.invalidate(achievementsProvider);
     ref.invalidate(achievementProgressProvider);
+    ref.invalidate(walletCoinsProvider);
   }
 
   @override
@@ -115,242 +122,295 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         title: const Text('设置'),
       ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-          children: [
-            _ProfileCard(isDarkMode: isDarkMode),
-            const SizedBox(height: AppSpacing.lg),
-            const _SectionTitle(title: '外观'),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('主题色', style: Theme.of(context).textTheme.titleLarge),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      '挑一个最符合你今天心情的颜色。',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    Wrap(
-                      spacing: AppSpacing.sm,
-                      runSpacing: AppSpacing.sm,
-                      children:
-                          List.generate(AppColors.themeColors.length, (index) {
-                        final color = AppColors.themeColors[index];
-                        final isSelected = index == themeColorIndex;
-                        return GestureDetector(
-                          onTap: () => _saveThemeColor(index),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            width: 42,
-                            height: 42,
-                            decoration: BoxDecoration(
-                              color: color,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isSelected
-                                    ? Colors.white
-                                    : Colors.transparent,
-                                width: 3,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: color.withValues(
-                                    alpha: isSelected ? 0.42 : 0.18,
-                                  ),
-                                  blurRadius: isSelected ? 16 : 10,
-                                  offset: const Offset(0, 8),
+        child: SanrioBackground(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            children: [
+              _ProfileCard(isDarkMode: isDarkMode),
+              const SizedBox(height: AppSpacing.lg),
+              const _SectionTitle(title: '外观'),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('主题色',
+                          style: Theme.of(context).textTheme.titleLarge),
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(
+                        '挑一个最符合你今天心情的颜色。',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Wrap(
+                        spacing: AppSpacing.sm,
+                        runSpacing: AppSpacing.sm,
+                        children: List.generate(AppColors.themeColors.length,
+                            (index) {
+                          final color = AppColors.themeColors[index];
+                          final isSelected = index == themeColorIndex;
+                          return GestureDetector(
+                            onTap: () => _saveThemeColor(index),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: color,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isSelected
+                                      ? Colors.white
+                                      : Colors.transparent,
+                                  width: 3,
                                 ),
-                              ],
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: color.withValues(
+                                      alpha: isSelected ? 0.42 : 0.18,
+                                    ),
+                                    blurRadius: isSelected ? 16 : 10,
+                                    offset: const Offset(0, 8),
+                                  ),
+                                ],
+                              ),
+                              child: isSelected
+                                  ? const Icon(
+                                      Icons.check_rounded,
+                                      color: Colors.white,
+                                      size: 20,
+                                    )
+                                  : null,
                             ),
-                            child: isSelected
-                                ? const Icon(
-                                    Icons.check_rounded,
-                                    color: Colors.white,
-                                    size: 20,
-                                  )
-                                : null,
-                          ),
-                        );
-                      }),
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
+                          );
+                        }),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          isDarkMode
+                              ? Icons.dark_mode_rounded
+                              : Icons.light_mode_rounded,
+                        ),
+                        title: const Text('深色模式'),
+                        subtitle: Text(isDarkMode ? '夜间阅读更舒适' : '保持明亮与轻盈'),
+                        trailing: Switch.adaptive(
+                          value: isDarkMode,
+                          onChanged: _saveDarkMode,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              const _SectionTitle(title: '成长'),
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.emoji_events_rounded),
+                  title: const Text('成就系统'),
+                  subtitle: Text(
+                    totalAchievementCount == 0
+                        ? '查看你的成长里程碑'
+                        : '已解锁 $unlockedCount / $totalAchievementCount',
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: _openAchievementPage,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              const _SectionTitle(title: '功能乐园'),
+              Card(
+                child: Column(
+                  children: [
+                    if (FeatureFlags.enableGachaSystem)
+                      ListTile(
+                        leading: const Icon(Icons.redeem_rounded),
+                        title: const Text('自律盲盒'),
+                        subtitle: const Text('抽取奖励道具，增强打卡趣味'),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: _openGachaPage,
+                      ),
+                    if (FeatureFlags.enableWidgetStudio)
+                      ListTile(
+                        leading: const Icon(Icons.widgets_rounded),
+                        title: const Text('桌面小组件中心'),
+                        subtitle: const Text('查看组件样式与添加指引'),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: _openWidgetStudioPage,
+                      ),
+                    if (FeatureFlags.enableSupervision)
+                      ListTile(
+                        leading: const Icon(Icons.groups_rounded),
+                        title: const Text('好友监督搭子'),
+                        subtitle: const Text('添加伙伴并生成鼓励日志'),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: _openSupervisionPage,
+                      ),
+                    if (FeatureFlags.enableSleepMode)
+                      ListTile(
+                        leading: const Icon(Icons.nightlight_round),
+                        title: const Text('呼吸伴睡'),
+                        subtitle: const Text('睡前呼吸放松模式'),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: _openSleepModePage,
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              const _SectionTitle(title: '通知'),
+              Card(
+                child: Column(
+                  children: [
                     ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                        isDarkMode
-                            ? Icons.dark_mode_rounded
-                            : Icons.light_mode_rounded,
+                      leading: const Icon(Icons.notifications_active_rounded),
+                      title: const Text('每日提醒'),
+                      subtitle: Text(
+                        dailyReminderEnabled
+                            ? '每天 ${dailyReminderTime.format(context)}'
+                            : '当前未开启',
                       ),
-                      title: const Text('深色模式'),
-                      subtitle: Text(isDarkMode ? '夜间阅读更舒适' : '保持明亮与轻盈'),
                       trailing: Switch.adaptive(
-                        value: isDarkMode,
-                        onChanged: _saveDarkMode,
+                        value: dailyReminderEnabled,
+                        onChanged: (value) async {
+                          ref
+                              .read(dailyReminderEnabledProvider.notifier)
+                              .state = value;
+                          try {
+                            await _saveReminderSettings(
+                                value, dailyReminderTime);
+                          } catch (error) {
+                            if (!context.mounted) {
+                              return;
+                            }
+                            ref
+                                .read(dailyReminderEnabledProvider.notifier)
+                                .state = false;
+                            showAppToast(
+                              context,
+                              '提醒设置失败：$error',
+                              type: AppToastType.error,
+                            );
+                          }
+                        },
                       ),
+                    ),
+                    if (dailyReminderEnabled)
+                      ListTile(
+                        leading: const SizedBox(width: 24),
+                        title: const Text('提醒时间'),
+                        trailing: Text(
+                          dailyReminderTime.format(context),
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                        ),
+                        onTap: () => _pickReminderTime(dailyReminderTime),
+                      ),
+                    ListTile(
+                      leading: const Icon(Icons.mark_chat_unread_rounded),
+                      title: const Text('发送测试通知'),
+                      subtitle: const Text('检查权限和通知样式是否生效'),
+                      onTap: _sendTestNotification,
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.settings_phone_rounded),
+                      title: const Text('前往系统通知设置'),
+                      subtitle: const Text('若部分机型不触发，请在系统中允许通知和自启动'),
+                      onTap: _openSystemNotificationSettings,
                     ),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            const _SectionTitle(title: '成长'),
-            Card(
-              child: ListTile(
-                leading: const Icon(Icons.emoji_events_rounded),
-                title: const Text('成就系统'),
-                subtitle: Text(
-                  totalAchievementCount == 0
-                      ? '查看你的成长里程碑'
-                      : '已解锁 $unlockedCount / $totalAchievementCount',
-                ),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: _openAchievementPage,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            const _SectionTitle(title: '通知'),
-            Card(
-              child: Column(
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.notifications_active_rounded),
-                    title: const Text('每日提醒'),
-                    subtitle: Text(
-                      dailyReminderEnabled
-                          ? '每天 ${dailyReminderTime.format(context)}'
-                          : '当前未开启',
-                    ),
-                    trailing: Switch.adaptive(
-                      value: dailyReminderEnabled,
-                      onChanged: (value) async {
-                        ref.read(dailyReminderEnabledProvider.notifier).state =
-                            value;
-                        try {
-                          await _saveReminderSettings(value, dailyReminderTime);
-                        } catch (error) {
-                          if (!context.mounted) {
-                            return;
-                          }
-                          ref
-                              .read(dailyReminderEnabledProvider.notifier)
-                              .state = false;
-                          showAppToast(
-                            context,
-                            '提醒设置失败：$error',
-                            type: AppToastType.error,
-                          );
-                        }
-                      },
-                    ),
-                  ),
-                  if (dailyReminderEnabled)
-                    ListTile(
-                      leading: const SizedBox(width: 24),
-                      title: const Text('提醒时间'),
-                      trailing: Text(
-                        dailyReminderTime.format(context),
-                        style:
-                            Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                      ),
-                      onTap: () => _pickReminderTime(dailyReminderTime),
-                    ),
-                  ListTile(
-                    leading: const Icon(Icons.mark_chat_unread_rounded),
-                    title: const Text('发送测试通知'),
-                    subtitle: const Text('检查权限和通知样式是否生效'),
-                    onTap: _sendTestNotification,
-                  ),
-                ],
-              ),
-            ),
-            if (FeatureFlags.enableHealthReminders) ...[
-              const SizedBox(height: AppSpacing.lg),
-              const _SectionTitle(title: '健康习惯联动'),
-              Card(
-                child: healthRemindersAsync.when(
-                  data: (items) {
-                    if (items.isEmpty) {
-                      return const ListTile(
-                        title: Text('暂无健康提醒配置'),
+              if (FeatureFlags.enableHealthReminders) ...[
+                const SizedBox(height: AppSpacing.lg),
+                const _SectionTitle(title: '健康习惯联动'),
+                Card(
+                  child: healthRemindersAsync.when(
+                    data: (items) {
+                      if (items.isEmpty) {
+                        return const ListTile(
+                          title: Text('暂无健康提醒配置'),
+                        );
+                      }
+                      return Column(
+                        children: items
+                            .map((item) => _buildHealthReminderTile(item))
+                            .toList(growable: false),
                       );
-                    }
-                    return Column(
-                      children: items
-                          .map((item) => _buildHealthReminderTile(item))
-                          .toList(growable: false),
-                    );
-                  },
-                  loading: () => const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 20),
-                    child: Center(child: CircularProgressIndicator()),
+                    },
+                    loading: () => const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                    error: (error, _) => ListTile(
+                      title: const Text('健康提醒加载失败'),
+                      subtitle: Text('$error'),
+                    ),
                   ),
-                  error: (error, _) => ListTile(
-                    title: const Text('健康提醒加载失败'),
-                    subtitle: Text('$error'),
-                  ),
+                ),
+              ],
+              const SizedBox(height: AppSpacing.lg),
+              const _SectionTitle(title: '数据'),
+              Card(
+                child: Column(
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.save_alt_rounded),
+                      title: const Text('导出备份'),
+                      subtitle: const Text('保存当前数据到应用备份目录'),
+                      onTap: _busy ? null : _exportBackup,
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.restore_rounded),
+                      title: const Text('恢复最近备份'),
+                      subtitle: const Text('使用最近导出的文件恢复当前数据'),
+                      onTap: _busy ? null : _restoreBackup,
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.share_rounded),
+                      title: const Text('分享最近备份'),
+                      subtitle: const Text('将最近一次备份文件发送出去'),
+                      onTap: _busy ? null : _shareBackup,
+                    ),
+                    ListTile(
+                      leading: const Icon(
+                        Icons.delete_sweep_rounded,
+                        color: AppColors.errorColor,
+                      ),
+                      title: const Text('清空所有数据'),
+                      subtitle: const Text('会删除习惯、记录、成就和成长数据'),
+                      onTap: _busy ? null : _confirmClearAllData,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              const _SectionTitle(title: '关于'),
+              const Card(
+                child: Column(
+                  children: [
+                    ListTile(
+                      leading: Icon(Icons.auto_awesome_rounded),
+                      title: Text('馨馨星球'),
+                      subtitle: Text('一个温柔、可爱的习惯养成应用'),
+                    ),
+                    ListTile(
+                      leading: Icon(Icons.info_outline_rounded),
+                      title: Text('版本'),
+                      subtitle: Text('4.0.0'),
+                    ),
+                  ],
                 ),
               ),
             ],
-            const SizedBox(height: AppSpacing.lg),
-            const _SectionTitle(title: '数据'),
-            Card(
-              child: Column(
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.save_alt_rounded),
-                    title: const Text('导出备份'),
-                    subtitle: const Text('保存当前数据到应用备份目录'),
-                    onTap: _busy ? null : _exportBackup,
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.restore_rounded),
-                    title: const Text('恢复最近备份'),
-                    subtitle: const Text('使用最近导出的文件恢复当前数据'),
-                    onTap: _busy ? null : _restoreBackup,
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.share_rounded),
-                    title: const Text('分享最近备份'),
-                    subtitle: const Text('将最近一次备份文件发送出去'),
-                    onTap: _busy ? null : _shareBackup,
-                  ),
-                  ListTile(
-                    leading: const Icon(
-                      Icons.delete_sweep_rounded,
-                      color: AppColors.errorColor,
-                    ),
-                    title: const Text('清空所有数据'),
-                    subtitle: const Text('会删除习惯、记录、成就和成长数据'),
-                    onTap: _busy ? null : _confirmClearAllData,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            const _SectionTitle(title: '关于'),
-            const Card(
-              child: Column(
-                children: [
-                  ListTile(
-                    leading: Icon(Icons.auto_awesome_rounded),
-                    title: Text('欣欣星球'),
-                    subtitle: Text('一个温柔、可爱的习惯养成应用'),
-                  ),
-                  ListTile(
-                    leading: Icon(Icons.info_outline_rounded),
-                    title: Text('版本'),
-                    subtitle: Text('3.2.1'),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -380,6 +440,30 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
+  void _openGachaPage() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const GachaPage()),
+    );
+  }
+
+  void _openWidgetStudioPage() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const WidgetStudioPage()),
+    );
+  }
+
+  void _openSupervisionPage() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const SupervisionPage()),
+    );
+  }
+
+  void _openSleepModePage() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const SleepModePage()),
+    );
+  }
+
   Future<void> _pickReminderTime(TimeOfDay current) async {
     final newTime = await showTimePicker(
       context: context,
@@ -402,13 +486,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Future<void> _sendTestNotification() async {
     await NotificationService.showInstantNotification(
-      title: '欣欣星球',
+      title: '馨馨星球',
       body: '测试通知已送达，提醒功能工作正常。',
     );
     if (!mounted) {
       return;
     }
     showAppToast(context, '测试通知已发送', type: AppToastType.success);
+  }
+
+  Future<void> _openSystemNotificationSettings() async {
+    final opened = await openAppSettings();
+    if (!mounted) {
+      return;
+    }
+    showAppToast(
+      context,
+      opened ? '已打开系统设置页' : '无法打开系统设置，请手动进入设置授权',
+      type: opened ? AppToastType.info : AppToastType.warning,
+    );
   }
 
   Widget _buildHealthReminderTile(HealthReminder reminder) {
@@ -551,9 +647,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       case 'water':
         return '💧 喝水时间到';
       case 'stand':
-        return '🧍 起身活动一下';
+        return '🧍 起来活动一下';
       case 'eye':
-        return '👀 让眼睛休息一会';
+        return '👀 让眼睛休息一下';
       default:
         return '健康提醒';
     }
@@ -698,9 +794,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 }
 
 class _ProfileCard extends StatelessWidget {
-  const _ProfileCard({
-    required this.isDarkMode,
-  });
+  const _ProfileCard({required this.isDarkMode});
 
   final bool isDarkMode;
 
@@ -766,9 +860,7 @@ class _ProfileCard extends StatelessWidget {
 }
 
 class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({
-    required this.title,
-  });
+  const _SectionTitle({required this.title});
 
   final String title;
 

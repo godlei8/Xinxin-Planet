@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_spacing.dart';
+import '../../../core/widgets/sanrio_background.dart';
 import '../../../services/providers.dart';
 import '../application/achievement_service.dart';
 
@@ -18,40 +19,42 @@ class AchievementPage extends ConsumerWidget {
         title: const Text('成就系统'),
       ),
       body: SafeArea(
-        child: achievementsAsync.when(
-          data: (achievements) {
-            final unlockedCount = achievements
-                .where((item) => item.achievement.isUnlocked)
-                .length;
+        child: SanrioBackground(
+          child: achievementsAsync.when(
+            data: (achievements) {
+              final unlockedCount = achievements
+                  .where((item) => item.achievement.isUnlocked)
+                  .length;
 
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-              children: [
-                _AchievementSummaryCard(
-                  unlockedCount: unlockedCount,
-                  totalCount: achievements.length,
-                  progressText: progressAsync.when(
-                    data: (progress) =>
-                        '总打卡 ${progress.totalCheckIns} 次 · 最佳连续 ${progress.bestStreak} 天',
-                    loading: () => '正在读取进度...',
-                    error: (_, __) => '进度读取失败',
+              return ListView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                children: [
+                  _AchievementSummaryCard(
+                    unlockedCount: unlockedCount,
+                    totalCount: achievements.length,
+                    progressText: progressAsync.when(
+                      data: (progress) =>
+                          '总打卡 ${progress.totalCheckIns} 次 · 最佳连续 ${progress.bestStreak} 天',
+                      loading: () => '正在读取进度...',
+                      error: (_, __) => '进度读取失败',
+                    ),
                   ),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                ...achievements.map(
-                  (item) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _AchievementTile(item: item),
+                  const SizedBox(height: AppSpacing.lg),
+                  ...achievements.map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _AchievementTile(item: item),
+                    ),
                   ),
-                ),
-              ],
-            );
-          },
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) => Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text('成就加载失败：$error'),
+                ],
+              );
+            },
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (error, _) => Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text('成就加载失败：$error'),
+              ),
             ),
           ),
         ),
