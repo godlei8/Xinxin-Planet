@@ -1,3 +1,5 @@
+import '../../../core/utils/date_utils.dart' as app_date;
+
 class PlanetPetSpecies {
   const PlanetPetSpecies({
     required this.id,
@@ -15,35 +17,35 @@ class PlanetPetSpecies {
     id: 'panda',
     label: '大熊猫',
     modelAsset: 'assets/models/panda.glb',
-    story: '慢热但很可靠，喜欢稳定节奏。',
+    story: '稳重温柔，最擅长陪你慢慢变厉害。',
   );
 
   static const rabbit = PlanetPetSpecies(
     id: 'rabbit',
     label: '兔子',
     modelAsset: 'assets/models/rabbit.glb',
-    story: '行动轻快，最擅长把任务拆小完成。',
+    story: '灵巧轻快，会提醒你把任务拆小做完。',
   );
 
   static const cat = PlanetPetSpecies(
     id: 'cat',
-    label: '猫',
+    label: '猫咪',
     modelAsset: 'assets/models/cat.glb',
-    story: '独立又温柔，喜欢有仪式感的打卡。',
+    story: '优雅自律，把每次打卡都变成小仪式。',
   );
 
   static const dog = PlanetPetSpecies(
     id: 'dog',
-    label: '狗',
+    label: '小狗',
     modelAsset: 'assets/models/dog.glb',
-    story: '活力满满，最会鼓励你持续坚持。',
+    story: '活力满格，最会给你情绪价值。',
   );
 
   static const fox = PlanetPetSpecies(
     id: 'fox',
     label: '狐狸',
     modelAsset: 'assets/models/fox.glb',
-    story: '聪明灵活，适合进阶目标挑战。',
+    story: '机灵聪明，适合挑战更高目标。',
   );
 
   static const values = [panda, rabbit, cat, dog, fox];
@@ -66,6 +68,8 @@ class PlanetPet {
     required this.energy,
     required this.mood,
     required this.lastInteractionAt,
+    required this.dailyInteractionUsed,
+    required this.dailyInteractionDate,
     this.lastFedAt,
     this.lastPlayAt,
     this.lastRestAt,
@@ -79,12 +83,15 @@ class PlanetPet {
   final int energy;
   final int mood;
   final int lastInteractionAt;
+  final int dailyInteractionUsed;
+  final String dailyInteractionDate;
   final int? lastFedAt;
   final int? lastPlayAt;
   final int? lastRestAt;
 
   static PlanetPet createDefault() {
     final now = DateTime.now().millisecondsSinceEpoch;
+    final today = app_date.DateUtils.getTodayString();
     return PlanetPet(
       id: 'main_pet',
       name: '团团',
@@ -94,6 +101,8 @@ class PlanetPet {
       energy: 72,
       mood: 78,
       lastInteractionAt: now,
+      dailyInteractionUsed: 0,
+      dailyInteractionDate: today,
       lastFedAt: now,
       lastPlayAt: null,
       lastRestAt: null,
@@ -103,6 +112,13 @@ class PlanetPet {
   PlanetPetSpecies get speciesMeta => PlanetPetSpecies.byId(species);
 
   int get nextLevelExp => 40 + ((level - 1) * 15);
+
+  int usedInteractionsOn(String date) {
+    if (dailyInteractionDate != date) {
+      return 0;
+    }
+    return dailyInteractionUsed.clamp(0, 999999);
+  }
 
   Map<String, dynamic> toMap() {
     return {
@@ -114,6 +130,8 @@ class PlanetPet {
       'energy': energy,
       'mood': mood,
       'last_interaction_at': lastInteractionAt,
+      'daily_interaction_used': dailyInteractionUsed,
+      'daily_interaction_date': dailyInteractionDate,
       'last_fed_at': lastFedAt,
       'last_play_at': lastPlayAt,
       'last_rest_at': lastRestAt,
@@ -131,6 +149,9 @@ class PlanetPet {
       mood: map['mood'] as int? ?? 70,
       lastInteractionAt: map['last_interaction_at'] as int? ??
           DateTime.now().millisecondsSinceEpoch,
+      dailyInteractionUsed: map['daily_interaction_used'] as int? ?? 0,
+      dailyInteractionDate: map['daily_interaction_date'] as String? ??
+          app_date.DateUtils.getTodayString(),
       lastFedAt: map['last_fed_at'] as int?,
       lastPlayAt: map['last_play_at'] as int?,
       lastRestAt: map['last_rest_at'] as int?,
@@ -146,6 +167,8 @@ class PlanetPet {
     int? energy,
     int? mood,
     int? lastInteractionAt,
+    int? dailyInteractionUsed,
+    String? dailyInteractionDate,
     int? lastFedAt,
     int? lastPlayAt,
     int? lastRestAt,
@@ -159,6 +182,8 @@ class PlanetPet {
       energy: energy ?? this.energy,
       mood: mood ?? this.mood,
       lastInteractionAt: lastInteractionAt ?? this.lastInteractionAt,
+      dailyInteractionUsed: dailyInteractionUsed ?? this.dailyInteractionUsed,
+      dailyInteractionDate: dailyInteractionDate ?? this.dailyInteractionDate,
       lastFedAt: lastFedAt ?? this.lastFedAt,
       lastPlayAt: lastPlayAt ?? this.lastPlayAt,
       lastRestAt: lastRestAt ?? this.lastRestAt,

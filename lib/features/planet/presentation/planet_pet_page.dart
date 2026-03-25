@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_spacing.dart';
+import '../../../core/utils/date_utils.dart' as app_date;
 import '../../../core/widgets/app_feedback.dart';
 import '../../../core/widgets/sanrio_background.dart';
 import '../../../services/providers.dart';
@@ -23,37 +24,57 @@ class _PlanetPetPageState extends ConsumerState<PlanetPetPage> {
   @override
   Widget build(BuildContext context) {
     final petAsync = ref.watch(planetPetProvider);
+    final interactionLimitAsync = ref.watch(petInteractionLimitProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('星球宠物')),
       body: SafeArea(
         child: SanrioBackground(
           child: petAsync.when(
-            data: (pet) => ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-              children: [
-                _PetHeroCard(
-                  pet: pet,
-                  onRename: _renamePet,
-                ),
-                const SizedBox(height: AppSpacing.md),
-                _SpeciesSelector(
-                  currentSpecies: pet.species,
-                  onSelect: _changeSpecies,
-                ),
-                const SizedBox(height: AppSpacing.md),
-                _StatusCard(pet: pet),
-                const SizedBox(height: AppSpacing.md),
-                _ActionPanel(
-                  busy: _busy,
-                  onFeed: () => _runPetAction((notifier) => notifier.feedPet()),
-                  onPlay: () =>
-                      _runPetAction((notifier) => notifier.playWithPet()),
-                  onPet: () => _runPetAction((notifier) => notifier.petPet()),
-                  onRest: () => _runPetAction((notifier) => notifier.restPet()),
-                ),
-              ],
-            ),
+            data: (pet) {
+              final today = app_date.DateUtils.getTodayString();
+              final interactionLimit = interactionLimitAsync.maybeWhen(
+                data: (value) => value,
+                orElse: () => 5,
+              );
+              final interactionUsed = pet.usedInteractionsOn(today);
+              final interactionLeft =
+                  (interactionLimit - interactionUsed).clamp(0, 99999);
+
+              return ListView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                children: [
+                  _PetHeroCard(
+                    pet: pet,
+                    onRename: _renamePet,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _SpeciesSelector(
+                    currentSpecies: pet.species,
+                    onSelect: _changeSpecies,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _StatusCard(
+                    pet: pet,
+                    interactionLeft: interactionLeft,
+                    interactionLimit: interactionLimit,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _ActionPanel(
+                    busy: _busy,
+                    interactionLeft: interactionLeft,
+                    interactionLimit: interactionLimit,
+                    onFeed: () =>
+                        _runPetAction((notifier) => notifier.feedPet()),
+                    onPlay: () =>
+                        _runPetAction((notifier) => notifier.playWithPet()),
+                    onPet: () => _runPetAction((notifier) => notifier.petPet()),
+                    onRest: () =>
+                        _runPetAction((notifier) => notifier.restPet()),
+                  ),
+                ],
+              );
+            },
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (error, _) => Center(
               child: Padding(
@@ -83,7 +104,11 @@ class _PlanetPetPageState extends ConsumerState<PlanetPetPage> {
       showAppToast(
         context,
         result.message,
-        type: result.leveledUp ? AppToastType.success : AppToastType.info,
+        type: result.blockedByLimit
+            ? AppToastType.warning
+            : result.leveledUp
+                ? AppToastType.success
+                : AppToastType.info,
       );
     } catch (error) {
       if (!mounted) {
@@ -133,11 +158,20 @@ class _PlanetPetPageState extends ConsumerState<PlanetPetPage> {
   }
 
   Future<void> _changeSpecies(String species) async {
-    await ref.read(planetPetProvider.notifier).changeSpecies(species);
+    final currentSpecies = ref.read(planetPetProvider).valueOrNull?.species;
+    if (currentSpecies == species) {
+      return;
+    }
+    ref.read(planetPetProvider.notifier).changeSpecies(species);
     if (!mounted) {
       return;
     }
-    showAppToast(context, '宠物外观已切换', type: AppToastType.success);
+    showAppToast(
+      context,
+      '宠物外观切换中，马上就好',
+      type: AppToastType.success,
+      duration: const Duration(milliseconds: 900),
+    );
   }
 }
 
@@ -171,7 +205,7 @@ class _PetHeroCard extends StatelessWidget {
           final model = _AnimatedPetPreview(
             modelAsset: pet.speciesMeta.modelAsset,
             alt: pet.speciesMeta.label,
-            size: compact ? 122 : 142,
+            size: compact ? 130 : 150,
           );
 
           final info = Column(
@@ -182,10 +216,19 @@ class _PetHeroCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       pet.name,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
+                      style:
+                          Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.4,
+                        shadows: const [
+                          Shadow(
+                            color: Color(0x4D000000),
+                            blurRadius: 10,
+                            offset: Offset(0, 2),
                           ),
+                        ],
+                      ),
                     ),
                   ),
                   IconButton(
@@ -199,6 +242,7 @@ class _PetHeroCard extends StatelessWidget {
                 '${pet.speciesMeta.label} · Lv.${pet.level}',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Colors.white.withValues(alpha: 0.95),
+                      fontWeight: FontWeight.w700,
                     ),
               ),
               const SizedBox(height: 6),
@@ -305,12 +349,14 @@ class _AnimatedPetPreviewState extends State<_AnimatedPetPreview>
             color: Colors.white.withValues(alpha: 0.18),
             borderRadius: BorderRadius.circular(24),
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: PetModelView(
-              modelAsset: widget.modelAsset,
-              alt: widget.alt,
-              cameraControls: true,
+          child: RepaintBoundary(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: PetModelView(
+                modelAsset: widget.modelAsset,
+                alt: widget.alt,
+                cameraControls: true,
+              ),
             ),
           ),
         ),
@@ -364,9 +410,15 @@ class _SpeciesSelector extends StatelessWidget {
 }
 
 class _StatusCard extends StatelessWidget {
-  const _StatusCard({required this.pet});
+  const _StatusCard({
+    required this.pet,
+    required this.interactionLeft,
+    required this.interactionLimit,
+  });
 
   final PlanetPet pet;
+  final int interactionLeft;
+  final int interactionLimit;
 
   @override
   Widget build(BuildContext context) {
@@ -396,6 +448,36 @@ class _StatusCard extends StatelessWidget {
               color: const Color(0xFFF08AB3),
             ),
             const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: Theme.of(context)
+                    .colorScheme
+                    .primaryContainer
+                    .withValues(alpha: 0.62),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.bolt_rounded,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '今日互动次数：$interactionLeft / $interactionLimit',
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
             Text(
               _petHint(pet),
               style: Theme.of(context).textTheme.bodySmall,
@@ -408,12 +490,12 @@ class _StatusCard extends StatelessWidget {
 
   static String _petHint(PlanetPet pet) {
     if (pet.energy < 25) {
-      return '宠物有点疲惫，先让它休息会更好。';
+      return '宠物有点疲惫，先休息再互动会更好。';
     }
     if (pet.mood < 35) {
       return '宠物情绪偏低，试试玩耍或摸摸头提升心情。';
     }
-    return '状态很不错，继续保持今天的陪伴节奏。';
+    return '完成一个习惯打卡可额外增加 1 次当日互动次数。';
   }
 }
 
@@ -464,6 +546,8 @@ class _StatusBar extends StatelessWidget {
 class _ActionPanel extends StatelessWidget {
   const _ActionPanel({
     required this.busy,
+    required this.interactionLeft,
+    required this.interactionLimit,
     required this.onFeed,
     required this.onPlay,
     required this.onPet,
@@ -471,6 +555,8 @@ class _ActionPanel extends StatelessWidget {
   });
 
   final bool busy;
+  final int interactionLeft;
+  final int interactionLimit;
   final VoidCallback onFeed;
   final VoidCallback onPlay;
   final VoidCallback onPet;
@@ -491,6 +577,11 @@ class _ActionPanel extends StatelessWidget {
                   .titleMedium
                   ?.copyWith(fontWeight: FontWeight.w800),
             ),
+            const SizedBox(height: 6),
+            Text(
+              '今日可互动 $interactionLimit 次，完成习惯打卡可继续增加。',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
             const SizedBox(height: 12),
             Wrap(
               spacing: 10,
@@ -499,22 +590,22 @@ class _ActionPanel extends StatelessWidget {
                 _PetActionButton(
                   icon: Icons.restaurant_rounded,
                   label: '喂食',
-                  onTap: busy ? null : onFeed,
+                  onTap: busy || interactionLeft <= 0 ? null : onFeed,
                 ),
                 _PetActionButton(
                   icon: Icons.sports_esports_rounded,
                   label: '玩耍',
-                  onTap: busy ? null : onPlay,
+                  onTap: busy || interactionLeft <= 0 ? null : onPlay,
                 ),
                 _PetActionButton(
                   icon: Icons.favorite_rounded,
                   label: '摸摸头',
-                  onTap: busy ? null : onPet,
+                  onTap: busy || interactionLeft <= 0 ? null : onPet,
                 ),
                 _PetActionButton(
                   icon: Icons.bedtime_rounded,
                   label: '休息',
-                  onTap: busy ? null : onRest,
+                  onTap: busy || interactionLeft <= 0 ? null : onRest,
                 ),
               ],
             ),

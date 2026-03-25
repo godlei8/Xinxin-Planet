@@ -4,7 +4,7 @@
 
 用于沉淀馨馨星球的架构约束、模块边界、研发流程和发布规范，确保版本迭代可持续、可维护、可回归。
 
-- 当前文档版本：`v5.0.0`
+- 当前文档版本：`v5.1.0`
 - 更新日期：`2026-03-25`
 
 ## 2. 产品定位
@@ -102,7 +102,30 @@
 - 测试通知前显式权限确认
 - 权限缺失时给出提示并引导打开系统设置
 
-## 6. 工程质量门禁
+## 6. 本轮增量修复（v5.1.0）
+
+### 6.1 首页视觉与图标稳定性
+
+- 修复首页蝴蝶装饰乱码（使用 Unicode 转义，避免编码污染）
+- 金币图标改为 `Icons.monetization_on_rounded`，规避 emoji 字体兼容问题
+
+### 6.2 3D 宠物模型与交互逻辑
+
+- 重制 5 个本地 GLB 模型（Q 版细节更完整）
+- 宠物名称字号与字重提升，强化识别
+- 宠物切换优化：状态先更新、异步持久化，缩短用户感知延迟
+- 新增每日互动次数机制：
+  - 基础次数：5 次/天
+  - 完成 1 个习惯打卡：+1 次当日互动额度
+  - 次数耗尽后阻断互动并提示引导
+
+### 6.3 模型渲染性能优化
+
+- `ModelViewer` 调整为 `loading: eager`
+- 关闭多余交互提示并优化自动旋转参数
+- 关键 3D 区域增加 `RepaintBoundary`，降低重绘影响
+
+## 7. 工程质量门禁
 
 每次提交至少满足：
 
@@ -118,13 +141,13 @@ flutter test
 - `flutter test`：通过
 - `flutter build apk --debug`：通过
 
-## 7. 适配策略
+## 8. 适配策略
 
 - 页面统一使用 `SafeArea`
 - 关键页面使用 `LayoutBuilder` 做窄屏降级
 - 高风险场景：小屏设备（<=360dp）、大字体模式、厂商通知限制
 
-## 8. 发布流程（Android）
+## 9. 发布流程（Android）
 
 1. 代码检查 + 自动化测试
 2. 构建 APK
@@ -138,7 +161,7 @@ flutter build apk --debug
 # release: flutter build apk --release
 ```
 
-## 9. 外部规范参考（官方）
+## 10. 外部规范参考（官方）
 
 - Flutter 自适应最佳实践：<https://docs.flutter.dev/ui/adaptive-responsive/best-practices>
 - Flutter 架构指南：<https://docs.flutter.dev/app-architecture/guide>

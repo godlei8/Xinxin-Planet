@@ -24,9 +24,16 @@ class PetModelView extends StatelessWidget {
       child: ModelViewer(
         src: modelAsset,
         alt: alt,
+        loading: Loading.eager,
+        reveal: Reveal.auto,
         ar: false,
         autoRotate: autoRotate,
+        autoRotateDelay: 0,
+        rotationPerSecond: '24deg',
         cameraControls: cameraControls,
+        disableZoom: !cameraControls,
+        interactionPrompt: InteractionPrompt.none,
+        shadowIntensity: 0.9,
       ),
     );
   }

@@ -209,9 +209,22 @@ class _HeroCard extends StatelessWidget {
           Positioned(
             top: -18,
             right: -10,
-            child: Text(
-              '馃巰',
-              style: TextStyle(fontSize: isDark ? 26 : 28),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '\u{1F98B}',
+                  style: TextStyle(fontSize: isDark ? 24 : 26),
+                ),
+                const SizedBox(width: 2),
+                Icon(
+                  Icons.favorite_rounded,
+                  size: isDark ? 14 : 15,
+                  color: isDark
+                      ? const Color(0xFFFFB8D7)
+                      : const Color(0xFFE86EA4),
+                ),
+              ],
             ),
           ),
           Positioned(
@@ -339,7 +352,20 @@ class _CoinsBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('🪙', style: TextStyle(fontSize: 15)),
+          Container(
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFD67D),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            alignment: Alignment.center,
+            child: const Icon(
+              Icons.monetization_on_rounded,
+              size: 14,
+              color: Color(0xFF8F5A00),
+            ),
+          ),
           const SizedBox(width: 6),
           coinsAsync.when(
             data: (coins) => Text(
@@ -400,9 +426,10 @@ class _HeroPetPeek extends StatelessWidget {
               children: [
                 Text(
                   pet.name,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         color: scheme.primary,
                         fontWeight: FontWeight.w900,
+                        letterSpacing: 0.2,
                       ),
                 ),
                 const SizedBox(height: 2),

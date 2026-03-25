@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/config/feature_flags.dart';
@@ -297,24 +299,46 @@ class PlanetPetActionResult {
     required this.pet,
     required this.message,
     this.leveledUp = false,
+    this.blockedByLimit = false,
+    this.interactionsLeft = 0,
+    this.interactionLimit = 0,
   });
 
   final PlanetPet pet;
   final String message;
   final bool leveledUp;
+  final bool blockedByLimit;
+  final int interactionsLeft;
+  final int interactionLimit;
 }
+
+const _basePetInteractionLimit = 5;
 
 final planetPetProvider =
     StateNotifierProvider<PlanetPetNotifier, AsyncValue<PlanetPet>>((ref) {
-  return PlanetPetNotifier(ref.watch(planetPetRepositoryProvider));
+  return PlanetPetNotifier(
+    ref.watch(planetPetRepositoryProvider),
+    ref.watch(checkRecordRepositoryProvider),
+  );
+});
+
+final petInteractionLimitProvider = FutureProvider<int>((ref) async {
+  // Refresh limit instantly when today's check-in list changes.
+  ref.watch(checkRecordsProvider);
+  final repository = ref.watch(checkRecordRepositoryProvider);
+  final records =
+      await repository.getRecordsByDate(app_date.DateUtils.getTodayString());
+  return _basePetInteractionLimit + records.length;
 });
 
 class PlanetPetNotifier extends StateNotifier<AsyncValue<PlanetPet>> {
-  PlanetPetNotifier(this._repository) : super(const AsyncValue.loading()) {
+  PlanetPetNotifier(this._repository, this._checkRecordRepository)
+      : super(const AsyncValue.loading()) {
     loadPet();
   }
 
   final PlanetPetRepository _repository;
+  final CheckRecordRepository _checkRecordRepository;
 
   Future<void> loadPet() async {
     state = const AsyncValue.loading();
@@ -339,12 +363,15 @@ class PlanetPetNotifier extends StateNotifier<AsyncValue<PlanetPet>> {
   Future<void> changeSpecies(String species) async {
     final current = state.valueOrNull ?? await _repository.getPet();
     final resolvedSpecies = PlanetPetSpecies.byId(species).id;
+    if (current.species == resolvedSpecies) {
+      return;
+    }
     final updated = current.copyWith(
       species: resolvedSpecies,
       lastInteractionAt: DateTime.now().millisecondsSinceEpoch,
     );
-    await _repository.savePet(updated);
     state = AsyncValue.data(updated);
+    unawaited(_repository.savePet(updated));
   }
 
   Future<PlanetPetActionResult> feedPet() async {
@@ -360,9 +387,18 @@ class PlanetPetNotifier extends StateNotifier<AsyncValue<PlanetPet>> {
   Future<PlanetPetActionResult> playWithPet() async {
     final current = state.valueOrNull ?? await _repository.getPet();
     if (current.energy < 15) {
+      final today = app_date.DateUtils.getTodayString();
+      final interactionLimit = await _resolveInteractionLimit(today);
+      final interactionsLeft = _computeInteractionsLeft(
+        pet: current,
+        date: today,
+        interactionLimit: interactionLimit,
+      );
       return PlanetPetActionResult(
         pet: current,
         message: '宠物体力不足，先让它休息一下吧。',
+        interactionsLeft: interactionsLeft,
+        interactionLimit: interactionLimit,
       );
     }
     return _applyAction(
@@ -403,7 +439,27 @@ class PlanetPetNotifier extends StateNotifier<AsyncValue<PlanetPet>> {
     bool markRest = false,
   }) async {
     final now = DateTime.now().millisecondsSinceEpoch;
-    final current = state.valueOrNull ?? await _repository.getPet();
+    final today = app_date.DateUtils.getTodayString();
+    final interactionLimit = await _resolveInteractionLimit(today);
+    var current = state.valueOrNull ?? await _repository.getPet();
+    if (current.dailyInteractionDate != today) {
+      current = current.copyWith(
+        dailyInteractionDate: today,
+        dailyInteractionUsed: 0,
+      );
+    }
+
+    final usedToday = current.usedInteractionsOn(today);
+    if (usedToday >= interactionLimit) {
+      return PlanetPetActionResult(
+        pet: current,
+        message:
+            '今日互动次数已用完（$interactionLimit/$interactionLimit），先去完成习惯打卡补充次数吧。',
+        blockedByLimit: true,
+        interactionsLeft: 0,
+        interactionLimit: interactionLimit,
+      );
+    }
 
     var level = current.level;
     var exp = current.exp + expGain;
@@ -422,6 +478,8 @@ class PlanetPetNotifier extends StateNotifier<AsyncValue<PlanetPet>> {
       energy: (current.energy + energyDelta).clamp(0, 100).toInt(),
       mood: (current.mood + moodDelta).clamp(0, 100).toInt(),
       lastInteractionAt: now,
+      dailyInteractionDate: today,
+      dailyInteractionUsed: usedToday + 1,
       lastFedAt: markFed ? now : current.lastFedAt,
       lastPlayAt: markPlay ? now : current.lastPlayAt,
       lastRestAt: markRest ? now : current.lastRestAt,
@@ -429,11 +487,32 @@ class PlanetPetNotifier extends StateNotifier<AsyncValue<PlanetPet>> {
 
     await _repository.savePet(updated);
     state = AsyncValue.data(updated);
+    final interactionsLeft =
+        (interactionLimit - updated.usedInteractionsOn(today)).clamp(0, 99999);
+    final finalMessage = leveledUp
+        ? '$message 已升级到 Lv.$level！'
+        : '$message（剩余互动 $interactionsLeft 次）';
     return PlanetPetActionResult(
       pet: updated,
-      message: leveledUp ? '$message 已升级到 Lv.$level！' : message,
+      message: finalMessage,
       leveledUp: leveledUp,
+      interactionsLeft: interactionsLeft,
+      interactionLimit: interactionLimit,
     );
+  }
+
+  int _computeInteractionsLeft({
+    required PlanetPet pet,
+    required String date,
+    required int interactionLimit,
+  }) {
+    final used = pet.usedInteractionsOn(date);
+    return (interactionLimit - used).clamp(0, 99999);
+  }
+
+  Future<int> _resolveInteractionLimit(String date) async {
+    final records = await _checkRecordRepository.getRecordsByDate(date);
+    return _basePetInteractionLimit + records.length;
   }
 
   int _expThreshold(int level) => 40 + ((level - 1) * 15);
