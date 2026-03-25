@@ -1,0 +1,35 @@
+name: xinxin_planet
+description: 馨馨星球（Xinxin Planet）- 极简可爱的自律打卡应用 v3.0
+publish_to: "none"
+version: 3.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  flutter_riverpod: ^2.4.0
+  sqflite: ^2.3.0
+  path: ^1.8.0
+  shared_preferences: ^2.2.0
+  table_calendar: ^3.0.0
+  fl_chart: ^0.65.0
+  google_fonts: ^6.1.0
+  intl: ^0.18.0
+  uuid: ^4.0.0
+  path_provider: ^2.1.0
+  share_plus: ^7.0.0
+  flutter_local_notifications: ^17.0.0
+  timezone: ^0.9.0
+  permission_handler: ^11.0.0
+  http: ^1.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
