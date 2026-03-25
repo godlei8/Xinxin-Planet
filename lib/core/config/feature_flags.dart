@@ -10,4 +10,5 @@ class FeatureFlags {
   static const bool enableSleepMode = true;
   static const bool enableWidgetStudio = true;
   static const bool enableSupervision = true;
+  static const bool enablePlanetPet = true;
 }

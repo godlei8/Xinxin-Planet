@@ -9,6 +9,8 @@ import '../../../core/widgets/sanrio_background.dart';
 import '../../../services/providers.dart';
 import '../../habits/domain/habit.dart';
 import '../../habits/presentation/add_edit_habit_page.dart';
+import '../../planet/domain/planet_pet.dart';
+import '../../planet/presentation/widgets/pet_model_view.dart';
 import '../data/daily_quote_service.dart';
 import '../domain/habit_suggestion.dart';
 import '../domain/user_progress.dart';
@@ -25,6 +27,7 @@ class HomePage extends ConsumerWidget {
     final quoteAsync = ref.watch(dailyQuoteProvider);
     final suggestionsAsync = ref.watch(habitSuggestionsProvider);
     final coinsAsync = ref.watch(walletCoinsProvider);
+    final petAsync = ref.watch(planetPetProvider);
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
@@ -46,6 +49,7 @@ class HomePage extends ConsumerWidget {
                       totalCount: habits.length,
                       quoteAsync: quoteAsync,
                       coinsAsync: coinsAsync,
+                      petAsync: petAsync,
                     ),
                     loading: () => const SizedBox.shrink(),
                     error: (_, __) => const SizedBox.shrink(),
@@ -130,6 +134,7 @@ class HomePage extends ConsumerWidget {
       builder: (context) => CheckInBottomSheet(
         habit: habit,
         onCheckInComplete: () async {
+          ref.invalidate(habitStreakProvider(habit.id));
           await Future.wait([
             ref.read(checkRecordsProvider.notifier).loadTodayRecords(),
             ref.read(userProgressProvider.notifier).loadProgress(),
@@ -155,6 +160,7 @@ class _HeroCard extends StatelessWidget {
     required this.totalCount,
     required this.quoteAsync,
     required this.coinsAsync,
+    required this.petAsync,
   });
 
   final UserProgress progress;
@@ -162,6 +168,7 @@ class _HeroCard extends StatelessWidget {
   final int totalCount;
   final AsyncValue<DailyQuote> quoteAsync;
   final AsyncValue<int> coinsAsync;
+  final AsyncValue<PlanetPet> petAsync;
 
   @override
   Widget build(BuildContext context) {
@@ -203,7 +210,7 @@ class _HeroCard extends StatelessWidget {
             top: -18,
             right: -10,
             child: Text(
-              '🎀',
+              '馃巰',
               style: TextStyle(fontSize: isDark ? 26 : 28),
             ),
           ),
@@ -224,10 +231,40 @@ class _HeroCard extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _HeroHeadline(
-                now: now,
-                titleColor: titleColor,
-                subtitleColor: subtitleColor,
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxWidth < 390;
+                  final headline = _HeroHeadline(
+                    now: now,
+                    titleColor: titleColor,
+                    subtitleColor: subtitleColor,
+                  );
+
+                  final petPeek = _HeroPetPeek(
+                    petAsync: petAsync,
+                    compact: compact,
+                  );
+
+                  if (compact) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        headline,
+                        const SizedBox(height: 10),
+                        petPeek,
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: headline),
+                      const SizedBox(width: 10),
+                      petPeek,
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 10),
               _CoinsBadge(coinsAsync: coinsAsync, titleColor: titleColor),
@@ -302,7 +339,7 @@ class _CoinsBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('💰', style: TextStyle(fontSize: 15)),
+          const Text('🪙', style: TextStyle(fontSize: 15)),
           const SizedBox(width: 6),
           coinsAsync.when(
             data: (coins) => Text(
@@ -328,6 +365,79 @@ class _CoinsBadge extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _HeroPetPeek extends StatelessWidget {
+  const _HeroPetPeek({
+    required this.petAsync,
+    required this.compact,
+  });
+
+  final AsyncValue<PlanetPet> petAsync;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final width = compact ? double.infinity : 118.0;
+    final scheme = Theme.of(context).colorScheme;
+
+    return SizedBox(
+      width: width,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.46),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.6)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: petAsync.when(
+            data: (pet) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  pet.name,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: scheme.primary,
+                        fontWeight: FontWeight.w900,
+                      ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${pet.speciesMeta.label} 路 Lv.${pet.level}',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: scheme.onSurface.withValues(alpha: 0.74),
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 72,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: PetModelView(
+                      modelAsset: pet.speciesMeta.modelAsset,
+                      alt: pet.speciesMeta.label,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            loading: () => const SizedBox(
+              height: 92,
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            ),
+            error: (_, __) => const SizedBox(
+              height: 92,
+              child: Center(
+                child: Icon(Icons.pets_rounded),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -433,102 +543,47 @@ class _QuotePanel extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final vertical = constraints.maxWidth < 430;
-
-                final textSection = Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      quote.english,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: titleColor,
-                            fontWeight: FontWeight.w800,
-                            height: 1.4,
-                          ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      quote.chinese,
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: subtitleColor,
-                            height: 1.45,
-                          ),
-                    ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _QuoteMetaChip(
-                          label: quote.date.isEmpty ? '今天' : quote.date,
-                          icon: Icons.calendar_today_rounded,
-                          isDark: isDark,
-                          textColor: titleColor,
-                        ),
-                        _QuoteMetaChip(
-                          label: quote.isFallback ? '离线备用文案' : quote.source,
-                          icon: quote.isFallback
-                              ? Icons.offline_bolt_rounded
-                              : Icons.public_rounded,
-                          isDark: isDark,
-                          textColor: titleColor,
-                        ),
-                      ],
-                    ),
-                  ],
-                );
-
-                final image = ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
-                  child: SizedBox(
-                    width: vertical ? double.infinity : 84,
-                    height: vertical ? 132 : 104,
-                    child: quote.imageUrl.isEmpty
-                        ? _QuoteImageFallback(
-                            vertical: vertical, isDark: isDark)
-                        : Image.network(
-                            quote.imageUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => _QuoteImageFallback(
-                                vertical: vertical, isDark: isDark),
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) {
-                                return child;
-                              }
-                              return _QuoteImageFallback(
-                                  vertical: vertical, isDark: isDark);
-                            },
-                          ),
+            Text(
+              quote.english,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: titleColor,
+                    fontWeight: FontWeight.w800,
+                    height: 1.4,
                   ),
-                );
-
-                if (vertical) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      image,
-                      const SizedBox(height: 14),
-                      textSection,
-                    ],
-                  );
-                }
-
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: textSection),
-                    const SizedBox(width: 12),
-                    image,
-                  ],
-                );
-              },
+            ),
+            const SizedBox(height: 8),
+            Text(
+              quote.chinese,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: subtitleColor,
+                    height: 1.45,
+                  ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _QuoteMetaChip(
+                  label: quote.date.isEmpty ? '今天' : quote.date,
+                  icon: Icons.calendar_today_rounded,
+                  isDark: isDark,
+                  textColor: titleColor,
+                ),
+                _QuoteMetaChip(
+                  label: quote.isFallback ? '离线文案' : quote.source,
+                  icon: quote.isFallback
+                      ? Icons.offline_bolt_rounded
+                      : Icons.public_rounded,
+                  isDark: isDark,
+                  textColor: titleColor,
+                ),
+              ],
             ),
           ],
         ),
         loading: () => SizedBox(
-          height: 138,
+          height: 118,
           child: Center(
             child: CircularProgressIndicator(color: titleColor),
           ),
@@ -593,38 +648,6 @@ class _QuoteMetaChip extends StatelessWidget {
                 ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _QuoteImageFallback extends StatelessWidget {
-  const _QuoteImageFallback({
-    required this.vertical,
-    required this.isDark,
-  });
-
-  final bool vertical;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDark
-              ? const [Color(0xFF4F3C5A), Color(0xFF2D4C67)]
-              : const [Color(0xFFFFD8EA), Color(0xFFD7EEFF)],
-        ),
-      ),
-      child: Center(
-        child: Icon(
-          vertical ? Icons.auto_stories_rounded : Icons.menu_book_rounded,
-          color: Colors.white.withValues(alpha: 0.92),
-          size: vertical ? 36 : 30,
-        ),
       ),
     );
   }
@@ -857,7 +880,7 @@ class _EmptyHabitsCard extends StatelessWidget {
               ),
               alignment: Alignment.center,
               child: const Text(
-                '🌟',
+                '🌼',
                 style: TextStyle(fontSize: 44),
               ),
             ),

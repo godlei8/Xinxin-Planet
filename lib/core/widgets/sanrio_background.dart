@@ -10,7 +10,24 @@ class SanrioBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = scheme.primary;
+    final secondary = scheme.secondary;
+    final tertiary = scheme.tertiary;
+
+    Color blend(Color source, Color target, double t) =>
+        Color.lerp(source, target, t)!;
+
+    final topColor = isDark
+        ? blend(primary, const Color(0xFF14121A), 0.82)
+        : blend(primary, Colors.white, 0.9);
+    final bottomColor = isDark
+        ? blend(secondary, const Color(0xFF18131D), 0.84)
+        : blend(secondary, Colors.white, 0.93);
+    final dotColor = isDark
+        ? blend(primary, Colors.white, 0.42).withValues(alpha: 0.2)
+        : primary.withValues(alpha: 0.14);
 
     return Stack(
       children: [
@@ -20,9 +37,7 @@ class SanrioBackground extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: isDark
-                    ? const [Color(0xFF1C1522), Color(0xFF241A2B)]
-                    : const [Color(0xFFFFF3FA), Color(0xFFFFFEFF)],
+                colors: [topColor, bottomColor],
               ),
             ),
           ),
@@ -30,10 +45,7 @@ class SanrioBackground extends StatelessWidget {
         Positioned.fill(
           child: IgnorePointer(
             child: CustomPaint(
-              painter: _DotPatternPainter(
-                color:
-                    isDark ? const Color(0x22FFFFFF) : const Color(0x22E95C96),
-              ),
+              painter: _DotPatternPainter(color: dotColor),
             ),
           ),
         ),
@@ -43,7 +55,9 @@ class SanrioBackground extends StatelessWidget {
           child: _CloudBlob(
             width: 176,
             height: 124,
-            color: isDark ? const Color(0x334E3A56) : const Color(0x99FFE0EE),
+            color: isDark
+                ? blend(primary, Colors.black, 0.55).withValues(alpha: 0.36)
+                : blend(primary, Colors.white, 0.78).withValues(alpha: 0.86),
           ),
         ),
         Positioned(
@@ -52,7 +66,9 @@ class SanrioBackground extends StatelessWidget {
           child: _CloudBlob(
             width: 132,
             height: 96,
-            color: isDark ? const Color(0x3341697D) : const Color(0x99DAF1FF),
+            color: isDark
+                ? blend(secondary, Colors.black, 0.52).withValues(alpha: 0.32)
+                : blend(secondary, Colors.white, 0.76).withValues(alpha: 0.8),
           ),
         ),
         Positioned(
@@ -61,7 +77,9 @@ class SanrioBackground extends StatelessWidget {
           child: _CloudBlob(
             width: 104,
             height: 78,
-            color: isDark ? const Color(0x334E6A62) : const Color(0x99E4F9E3),
+            color: isDark
+                ? blend(tertiary, Colors.black, 0.58).withValues(alpha: 0.26)
+                : blend(tertiary, Colors.white, 0.78).withValues(alpha: 0.72),
           ),
         ),
         Positioned(
@@ -69,7 +87,9 @@ class SanrioBackground extends StatelessWidget {
           right: 20,
           child: _Sparkle(
             icon: Icons.favorite_rounded,
-            color: isDark ? const Color(0xCCFFC5E2) : const Color(0xFFE95C96),
+            color: isDark
+                ? blend(primary, Colors.white, 0.58)
+                : blend(primary, const Color(0xFFC23B77), 0.38),
             size: 14,
           ),
         ),
@@ -78,7 +98,9 @@ class SanrioBackground extends StatelessWidget {
           left: 34,
           child: _Sparkle(
             icon: Icons.auto_awesome_rounded,
-            color: isDark ? const Color(0xCCFFE69A) : const Color(0xFFF5B746),
+            color: isDark
+                ? blend(tertiary, Colors.white, 0.52)
+                : blend(tertiary, const Color(0xFFE39A31), 0.32),
             size: 13,
           ),
         ),
@@ -87,7 +109,9 @@ class SanrioBackground extends StatelessWidget {
           right: 26,
           child: _Sparkle(
             icon: Icons.star_rounded,
-            color: isDark ? const Color(0xCCBCE4FF) : const Color(0xFF77BBE7),
+            color: isDark
+                ? blend(secondary, Colors.white, 0.56)
+                : blend(secondary, const Color(0xFF4A99CB), 0.36),
             size: 15,
           ),
         ),

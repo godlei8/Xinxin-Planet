@@ -169,11 +169,32 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                       ),
                       calendarStyle: CalendarStyle(
                         outsideDaysVisible: false,
+                        defaultTextStyle: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        weekendTextStyle: TextStyle(
+                          color: Theme.of(context).colorScheme.secondary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        outsideTextStyle: TextStyle(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.35),
+                          fontWeight: FontWeight.w600,
+                        ),
+                        selectedTextStyle: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                        ),
+                        todayTextStyle: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w800,
+                        ),
                         defaultDecoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(14),
                         ),
-                        weekendTextStyle:
-                            const TextStyle(color: AppColors.secondaryColor),
                         selectedDecoration: BoxDecoration(
                           color: Theme.of(context).colorScheme.primary,
                           borderRadius: BorderRadius.circular(14),
@@ -192,50 +213,37 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                         markersMaxCount: 3,
                       ),
                       calendarBuilders: CalendarBuilders(
-                        markerBuilder: (context, day, events) {
-                          if (events.isEmpty) {
-                            return null;
-                          }
-                          return Positioned(
-                            bottom: 6,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: List.generate(
-                                events.length.clamp(0, 3),
-                                (index) => Container(
-                                  width: 5,
-                                  height: 5,
-                                  margin:
-                                      const EdgeInsets.symmetric(horizontal: 1),
-                                  decoration: const BoxDecoration(
-                                    color: AppColors.successColor,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
                         selectedBuilder: (context, day, focusedDay) =>
-                            _buildHolidayCell(
+                            _buildDayCell(
                           context,
                           day,
                           selected: true,
                           today: false,
+                          outside: false,
                         ),
                         todayBuilder: (context, day, focusedDay) =>
-                            _buildHolidayCell(
+                            _buildDayCell(
                           context,
                           day,
                           selected: false,
                           today: true,
+                          outside: false,
                         ),
                         defaultBuilder: (context, day, focusedDay) =>
-                            _buildHolidayCell(
+                            _buildDayCell(
                           context,
                           day,
                           selected: false,
                           today: false,
+                          outside: false,
+                        ),
+                        outsideBuilder: (context, day, focusedDay) =>
+                            _buildDayCell(
+                          context,
+                          day,
+                          selected: false,
+                          today: false,
+                          outside: true,
                         ),
                       ),
                     ),
@@ -264,39 +272,58 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     );
   }
 
-  Widget? _buildHolidayCell(
+  Widget _buildDayCell(
     BuildContext context,
     DateTime day, {
     required bool selected,
     required bool today,
+    required bool outside,
   }) {
+    final hasRecords = _recordsByDate[selectedDayKey(day)]?.isNotEmpty ?? false;
     final holiday = _holidayLabels[_holidayKey(day)];
-    if (holiday == null) {
-      return null;
-    }
-
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final fallbackTextColor =
+        theme.textTheme.bodyMedium?.color ?? scheme.onSurface;
     final dayTextColor = selected
         ? Colors.white
-        : today
-            ? theme.colorScheme.primary
-            : theme.textTheme.bodyMedium?.color;
-    final holidayColor = selected
-        ? Colors.white
-        : AppColors.secondaryColor.withValues(alpha: 0.95);
+        : outside
+            ? fallbackTextColor.withValues(alpha: 0.45)
+            : hasRecords
+                ? scheme.primary
+                : today
+                    ? scheme.primary
+                    : fallbackTextColor;
+    final holidayColor =
+        selected ? Colors.white.withValues(alpha: 0.95) : scheme.secondary;
     final background = selected
-        ? theme.colorScheme.primary.withValues(alpha: 0.86)
+        ? scheme.primary.withValues(alpha: 0.9)
         : today
-            ? theme.colorScheme.primary.withValues(alpha: 0.14)
-            : AppColors.secondaryColor.withValues(alpha: 0.12);
+            ? scheme.primary.withValues(alpha: 0.14)
+            : hasRecords
+                ? scheme.primary.withValues(alpha: 0.1)
+                : holiday != null
+                    ? scheme.secondary.withValues(alpha: 0.1)
+                    : Colors.transparent;
+    final borderColor = selected
+        ? scheme.primary
+        : hasRecords
+            ? scheme.primary.withValues(alpha: 0.35)
+            : holiday != null
+                ? scheme.secondary.withValues(alpha: 0.3)
+                : Colors.transparent;
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 140),
       margin: const EdgeInsets.all(4),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
@@ -306,17 +333,30 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            holiday,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: holidayColor,
-              fontWeight: FontWeight.w800,
-              fontSize: 9,
+          if (holiday != null) ...[
+            const SizedBox(height: 1),
+            Text(
+              holiday,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: holidayColor,
+                fontWeight: FontWeight.w800,
+                fontSize: 9,
+              ),
             ),
-          ),
+          ] else
+            const SizedBox(height: 11),
+          if (hasRecords)
+            Container(
+              width: 6,
+              height: 6,
+              margin: const EdgeInsets.only(top: 2),
+              decoration: BoxDecoration(
+                color: selected ? Colors.white : AppColors.successColor,
+                shape: BoxShape.circle,
+              ),
+            ),
         ],
       ),
     );
@@ -341,35 +381,52 @@ class _StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _StatCard(
-            icon: Icons.local_fire_department_rounded,
-            label: '\u8fde\u80dc',
-            value: '$currentStreak \u5929',
-            color: Colors.orange,
-          ),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: _StatCard(
-            icon: Icons.check_circle_rounded,
-            label: '\u603b\u6253\u5361',
-            value: '$totalCheckIns \u6b21',
-            color: AppColors.successColor,
-          ),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: _StatCard(
-            icon: Icons.calendar_month_rounded,
-            label: '\u6d3b\u8dc3\u65e5',
-            value: '$activeDays \u5929',
-            color: AppColors.primaryColor,
-          ),
-        ),
-      ],
+    final cards = [
+      _StatCard(
+        icon: Icons.local_fire_department_rounded,
+        label: '\u8fde\u80dc',
+        value: '$currentStreak \u5929',
+        color: Colors.orange,
+      ),
+      _StatCard(
+        icon: Icons.check_circle_rounded,
+        label: '\u603b\u6253\u5361',
+        value: '$totalCheckIns \u6b21',
+        color: AppColors.successColor,
+      ),
+      _StatCard(
+        icon: Icons.calendar_month_rounded,
+        label: '\u6d3b\u8dc3\u65e5',
+        value: '$activeDays \u5929',
+        color: AppColors.primaryColor,
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 360;
+        if (compact) {
+          final itemWidth = (constraints.maxWidth - AppSpacing.sm) / 2;
+          return Wrap(
+            alignment: WrapAlignment.center,
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: cards
+                .map((card) => SizedBox(width: itemWidth, child: card))
+                .toList(),
+          );
+        }
+
+        return Row(
+          children: [
+            Expanded(child: cards[0]),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(child: cards[1]),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(child: cards[2]),
+          ],
+        );
+      },
     );
   }
 }
@@ -390,23 +447,35 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(height: 10),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.w900,
-                  ),
-            ),
-            const SizedBox(height: 2),
-            Text(label, style: Theme.of(context).textTheme.bodySmall),
-          ],
+      child: SizedBox(
+        height: 106,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Icon(icon, color: color, size: 22),
+              const SizedBox(height: 8),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  value,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: color,
+                        fontWeight: FontWeight.w900,
+                      ),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -85,7 +85,7 @@ class DateUtils {
       '九月',
       '十月',
       '十一月',
-      '十二月'
+      '十二月',
     ];
     return names[month - 1];
   }

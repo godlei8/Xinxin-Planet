@@ -574,14 +574,14 @@ class _CheckInBottomSheetState extends ConsumerState<CheckInBottomSheet> {
       await ref.read(gachaRepositoryProvider).addCoins(3);
 
       var unlocked = <Achievement>[];
+      var achievementBonus = 0;
       if (FeatureFlags.enableAchievementSystem) {
-        unlocked =
-            await ref.read(achievementServiceProvider).evaluateAndUnlock();
+        final achievementService = ref.read(achievementServiceProvider);
+        unlocked = await achievementService.evaluateAndUnlock();
+        achievementBonus = achievementService.totalRewardCoins(unlocked);
         ref.invalidate(achievementsProvider);
         ref.invalidate(achievementProgressProvider);
       }
-
-      final achievementBonus = unlocked.length * 10;
       if (achievementBonus > 0) {
         await ref.read(gachaRepositoryProvider).addCoins(achievementBonus);
       }

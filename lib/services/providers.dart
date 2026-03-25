@@ -20,8 +20,10 @@ import '../features/home/data/user_progress_repository.dart';
 import '../features/home/domain/habit_suggestion.dart';
 import '../features/home/domain/user_progress.dart';
 import '../features/planet/data/gacha_repository.dart';
+import '../features/planet/data/planet_pet_repository.dart';
 import '../features/planet/data/sleep_mode_repository.dart';
 import '../features/planet/data/supervision_repository.dart';
+import '../features/planet/domain/planet_pet.dart';
 import '../features/settings/data/health_reminder_repository.dart';
 import '../features/settings/domain/health_reminder.dart';
 
@@ -42,6 +44,7 @@ final focusForestRepositoryProvider =
 final healthReminderRepositoryProvider =
     Provider((ref) => HealthReminderRepository());
 final gachaRepositoryProvider = Provider((ref) => GachaRepository());
+final planetPetRepositoryProvider = Provider((ref) => PlanetPetRepository());
 final supervisionRepositoryProvider =
     Provider((ref) => SupervisionRepository());
 final sleepModeRepositoryProvider = Provider((ref) => SleepModeRepository());
@@ -202,6 +205,8 @@ class UserProgressNotifier extends StateNotifier<AsyncValue<UserProgress>> {
 
 final habitStreakProvider =
     FutureProvider.family<int, String>((ref, habitId) async {
+  // Recompute streak right after today's check-in state changes.
+  ref.watch(checkRecordsProvider);
   final repository = ref.watch(checkRecordRepositoryProvider);
   final checkedDates = await repository.getCheckedDatesForHabit(habitId);
   return StreakCalculator.calculateCurrentStreak(checkedDates);
@@ -285,4 +290,151 @@ class HealthRemindersNotifier
     await _repository.updateReminder(reminder);
     await loadReminders();
   }
+}
+
+class PlanetPetActionResult {
+  const PlanetPetActionResult({
+    required this.pet,
+    required this.message,
+    this.leveledUp = false,
+  });
+
+  final PlanetPet pet;
+  final String message;
+  final bool leveledUp;
+}
+
+final planetPetProvider =
+    StateNotifierProvider<PlanetPetNotifier, AsyncValue<PlanetPet>>((ref) {
+  return PlanetPetNotifier(ref.watch(planetPetRepositoryProvider));
+});
+
+class PlanetPetNotifier extends StateNotifier<AsyncValue<PlanetPet>> {
+  PlanetPetNotifier(this._repository) : super(const AsyncValue.loading()) {
+    loadPet();
+  }
+
+  final PlanetPetRepository _repository;
+
+  Future<void> loadPet() async {
+    state = const AsyncValue.loading();
+    try {
+      final pet = await _repository.getPet();
+      state = AsyncValue.data(pet);
+    } catch (error, stackTrace) {
+      state = AsyncValue.error(error, stackTrace);
+    }
+  }
+
+  Future<void> renamePet(String name) async {
+    final current = state.valueOrNull ?? await _repository.getPet();
+    final updated = current.copyWith(
+      name: name.trim(),
+      lastInteractionAt: DateTime.now().millisecondsSinceEpoch,
+    );
+    await _repository.savePet(updated);
+    state = AsyncValue.data(updated);
+  }
+
+  Future<void> changeSpecies(String species) async {
+    final current = state.valueOrNull ?? await _repository.getPet();
+    final resolvedSpecies = PlanetPetSpecies.byId(species).id;
+    final updated = current.copyWith(
+      species: resolvedSpecies,
+      lastInteractionAt: DateTime.now().millisecondsSinceEpoch,
+    );
+    await _repository.savePet(updated);
+    state = AsyncValue.data(updated);
+  }
+
+  Future<PlanetPetActionResult> feedPet() async {
+    return _applyAction(
+      energyDelta: 20,
+      moodDelta: 6,
+      expGain: 14,
+      message: '喂食成功，宠物吃得很开心。',
+      markFed: true,
+    );
+  }
+
+  Future<PlanetPetActionResult> playWithPet() async {
+    final current = state.valueOrNull ?? await _repository.getPet();
+    if (current.energy < 15) {
+      return PlanetPetActionResult(
+        pet: current,
+        message: '宠物体力不足，先让它休息一下吧。',
+      );
+    }
+    return _applyAction(
+      energyDelta: -16,
+      moodDelta: 18,
+      expGain: 18,
+      message: '玩耍完成，宠物心情明显变好了。',
+      markPlay: true,
+    );
+  }
+
+  Future<PlanetPetActionResult> petPet() async {
+    return _applyAction(
+      energyDelta: -3,
+      moodDelta: 10,
+      expGain: 8,
+      message: '摸摸头成功，宠物黏人值上升。',
+    );
+  }
+
+  Future<PlanetPetActionResult> restPet() async {
+    return _applyAction(
+      energyDelta: 28,
+      moodDelta: 4,
+      expGain: 10,
+      message: '休息完成，宠物状态恢复了不少。',
+      markRest: true,
+    );
+  }
+
+  Future<PlanetPetActionResult> _applyAction({
+    required int energyDelta,
+    required int moodDelta,
+    required int expGain,
+    required String message,
+    bool markFed = false,
+    bool markPlay = false,
+    bool markRest = false,
+  }) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final current = state.valueOrNull ?? await _repository.getPet();
+
+    var level = current.level;
+    var exp = current.exp + expGain;
+    var leveledUp = false;
+    var threshold = _expThreshold(level);
+    while (exp >= threshold) {
+      exp -= threshold;
+      level += 1;
+      leveledUp = true;
+      threshold = _expThreshold(level);
+    }
+
+    final updated = current.copyWith(
+      level: level,
+      exp: exp,
+      energy: (current.energy + energyDelta).clamp(0, 100).toInt(),
+      mood: (current.mood + moodDelta).clamp(0, 100).toInt(),
+      lastInteractionAt: now,
+      lastFedAt: markFed ? now : current.lastFedAt,
+      lastPlayAt: markPlay ? now : current.lastPlayAt,
+      lastRestAt: markRest ? now : current.lastRestAt,
+    );
+
+    await _repository.savePet(updated);
+    state = AsyncValue.data(updated);
+    return PlanetPetActionResult(
+      pet: updated,
+      message: leveledUp ? '$message 已升级到 Lv.$level！' : message,
+      leveledUp: leveledUp,
+    );
+  }
+
+  int _expThreshold(int level) => 40 + ((level - 1) * 15);
 }

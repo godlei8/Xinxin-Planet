@@ -64,6 +64,30 @@ class AchievementService {
     return unlocked;
   }
 
+  int rewardCoinsForAchievement(String achievementId) {
+    switch (achievementId) {
+      case 'first_checkin':
+        return 10;
+      case 'week_warrior':
+        return 20;
+      case 'month_master':
+        return 60;
+      case 'century_star':
+        return 180;
+      case 'habit_creator':
+        return 30;
+      default:
+        return 10;
+    }
+  }
+
+  int totalRewardCoins(Iterable<Achievement> achievements) {
+    return achievements.fold<int>(
+      0,
+      (sum, item) => sum + rewardCoinsForAchievement(item.id),
+    );
+  }
+
   Future<List<AchievementProgress>> getAchievementProgresses() async {
     final all = await _achievementRepository.getAllAchievements();
     final progress = await _userProgressRepository.getUserProgress();

@@ -12,6 +12,7 @@ import '../../../core/widgets/app_feedback.dart';
 import '../../../core/widgets/sanrio_background.dart';
 import '../../../features/habits/presentation/achievement_page.dart';
 import '../../../features/planet/presentation/gacha_page.dart';
+import '../../../features/planet/presentation/planet_pet_page.dart';
 import '../../../features/planet/presentation/sleep_mode_page.dart';
 import '../../../features/planet/presentation/supervision_page.dart';
 import '../../../features/planet/presentation/widget_studio_page.dart';
@@ -64,7 +65,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       if (!mounted) {
         return;
       }
-      showAppToast(context, '已关闭每日提醒', type: AppToastType.info);
+      showAppToast(context, '每日提醒已关闭', type: AppToastType.info);
       return;
     }
 
@@ -91,6 +92,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ref.read(habitsProvider.notifier).loadHabits(),
       ref.read(checkRecordsProvider.notifier).loadTodayRecords(),
       ref.read(userProgressProvider.notifier).loadProgress(),
+      ref.read(planetPetProvider.notifier).loadPet(),
     ]);
     ref.invalidate(categoriesProvider);
     ref.invalidate(achievementsProvider);
@@ -139,7 +141,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                           style: Theme.of(context).textTheme.titleLarge),
                       const SizedBox(height: AppSpacing.sm),
                       Text(
-                        '挑一个最符合你今天心情的颜色。',
+                        '选择一个更符合你今天心情的颜色。',
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                       const SizedBox(height: AppSpacing.md),
@@ -236,7 +238,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     if (FeatureFlags.enableWidgetStudio)
                       ListTile(
                         leading: const Icon(Icons.widgets_rounded),
-                        title: const Text('桌面小组件中心'),
+                        title: const Text('桌面组件中心'),
                         subtitle: const Text('查看组件样式与添加指引'),
                         trailing: const Icon(Icons.chevron_right_rounded),
                         onTap: _openWidgetStudioPage,
@@ -256,6 +258,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         subtitle: const Text('睡前呼吸放松模式'),
                         trailing: const Icon(Icons.chevron_right_rounded),
                         onTap: _openSleepModePage,
+                      ),
+                    if (FeatureFlags.enablePlanetPet)
+                      ListTile(
+                        leading: const Icon(Icons.pets_rounded),
+                        title: const Text('星球宠物'),
+                        subtitle: const Text('喂食、互动、升级，培养专属星球伙伴'),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: _openPlanetPetPage,
                       ),
                   ],
                 ),
@@ -464,6 +474,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
+  void _openPlanetPetPage() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const PlanetPetPage()),
+    );
+  }
+
   Future<void> _pickReminderTime(TimeOfDay current) async {
     final newTime = await showTimePicker(
       context: context,
@@ -485,14 +501,35 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Future<void> _sendTestNotification() async {
-    await NotificationService.showInstantNotification(
-      title: '馨馨星球',
-      body: '测试通知已送达，提醒功能工作正常。',
-    );
-    if (!mounted) {
-      return;
+    try {
+      final granted = await NotificationService.ensurePermissions();
+      if (!granted) {
+        if (!mounted) {
+          return;
+        }
+        showAppToast(
+          context,
+          '通知权限未开启，已为你打开系统设置页',
+          type: AppToastType.warning,
+        );
+        await openAppSettings();
+        return;
+      }
+
+      await NotificationService.showInstantNotification(
+        title: '馨馨星球',
+        body: '这是一条测试通知，用于检查提醒权限和通知样式。',
+      );
+      if (!mounted) {
+        return;
+      }
+      showAppToast(context, '测试通知已发送', type: AppToastType.success);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      showAppToast(context, '测试通知发送失败：$error', type: AppToastType.error);
     }
-    showAppToast(context, '测试通知已发送', type: AppToastType.success);
   }
 
   Future<void> _openSystemNotificationSettings() async {
@@ -502,7 +539,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
     showAppToast(
       context,
-      opened ? '已打开系统设置页' : '无法打开系统设置，请手动进入设置授权',
+      opened ? '已打开系统设置页' : '无法打开系统设置，请手动进入系统设置授权',
       type: opened ? AppToastType.info : AppToastType.warning,
     );
   }
@@ -511,9 +548,19 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     const options = [30, 45, 60, 90, 120, 180];
 
     return ListTile(
-      leading: Text(
-        _healthEmoji(reminder.reminderType),
-        style: const TextStyle(fontSize: 24),
+      leading: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        alignment: Alignment.center,
+        child: Icon(
+          _healthIcon(reminder.reminderType),
+          size: 20,
+          color: Theme.of(context).colorScheme.primary,
+        ),
       ),
       title: Text(_healthLabel(reminder.reminderType)),
       subtitle: Text(
@@ -616,16 +663,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   int _healthReminderId(String type) => type.hashCode & 0x7fffffff;
 
-  String _healthEmoji(String type) {
+  IconData _healthIcon(String type) {
     switch (type) {
       case 'water':
-        return '💧';
+        return Icons.local_drink_rounded;
       case 'stand':
-        return '🧍';
+        return Icons.airline_seat_recline_extra_rounded;
       case 'eye':
-        return '👀';
+        return Icons.visibility_rounded;
       default:
-        return '✅';
+        return Icons.favorite_rounded;
     }
   }
 
@@ -645,11 +692,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   String _healthTitle(String type) {
     switch (type) {
       case 'water':
-        return '💧 喝水时间到';
+        return '喝水时间到';
       case 'stand':
-        return '🧍 起来活动一下';
+        return '久坐提醒';
       case 'eye':
-        return '👀 让眼睛休息一下';
+        return '护眼提醒';
       default:
         return '健康提醒';
     }

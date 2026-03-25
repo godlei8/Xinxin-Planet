@@ -226,7 +226,9 @@ class NotificationService {
     required String body,
     String? payload,
   }) async {
-    await initialize();
+    if (!await ensurePermissions()) {
+      throw Exception('通知权限未开启，请先授权通知权限');
+    }
 
     const androidDetails = AndroidNotificationDetails(
       'instant_notifications',
@@ -240,13 +242,15 @@ class NotificationService {
 
     const iosDetails = DarwinNotificationDetails();
 
-    await _notificationsPlugin.show(
-      DateTime.now().millisecondsSinceEpoch.remainder(100000),
-      title,
-      body,
-      const NotificationDetails(android: androidDetails, iOS: iosDetails),
-      payload: payload,
-    );
+    await _runWithAndroidCacheRecovery(() {
+      return _notificationsPlugin.show(
+        DateTime.now().millisecondsSinceEpoch.remainder(100000),
+        title,
+        body,
+        const NotificationDetails(android: androidDetails, iOS: iosDetails),
+        payload: payload,
+      );
+    });
   }
 
   static Future<void> cancelHabitReminder(int id) async {
