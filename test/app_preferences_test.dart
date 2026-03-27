@@ -44,4 +44,20 @@ void main() {
     expect(snapshot.dailyReminder.hour, 8);
     expect(snapshot.dailyReminder.minute, 30);
   });
+
+  test('persists and reloads daily quote cache', () async {
+    final prefs = await SharedPreferences.getInstance();
+    final repository = AppPreferencesRepository(prefs);
+
+    await repository.saveDailyQuoteCache(
+      date: '2026-03-28',
+      payload: '{"content":"hello"}',
+    );
+
+    final cache = repository.readDailyQuoteCache();
+
+    expect(cache, isNotNull);
+    expect(cache!.date, '2026-03-28');
+    expect(cache.payload, '{"content":"hello"}');
+  });
 }

@@ -42,7 +42,11 @@ final achievementRepositoryProvider =
     Provider((ref) => AchievementRepository());
 final userProgressRepositoryProvider =
     Provider((ref) => UserProgressRepository());
-final dailyQuoteServiceProvider = Provider((ref) => DailyQuoteService());
+final dailyQuoteServiceProvider = Provider(
+  (ref) => DailyQuoteService(
+    preferences: ref.watch(appPreferencesRepositoryProvider),
+  ),
+);
 final focusForestRepositoryProvider =
     Provider((ref) => FocusForestRepository());
 final healthReminderRepositoryProvider =

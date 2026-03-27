@@ -53,6 +53,16 @@ class AppPreferencesSnapshot {
   final DailyReminderSettings dailyReminder;
 }
 
+class DailyQuoteCacheEntry {
+  const DailyQuoteCacheEntry({
+    required this.date,
+    required this.payload,
+  });
+
+  final String date;
+  final String payload;
+}
+
 class AppPreferencesRepository {
   AppPreferencesRepository(this._prefs);
 
@@ -104,6 +114,23 @@ class AppPreferencesRepository {
       AppPreferenceKeys.dailyReminderMinute,
       settings.minute,
     );
+  }
+
+  DailyQuoteCacheEntry? readDailyQuoteCache() {
+    final date = _prefs.getString(AppPreferenceKeys.dailyQuoteCacheDate);
+    final payload = _prefs.getString(AppPreferenceKeys.dailyQuoteCachePayload);
+    if (date == null || date.isEmpty || payload == null || payload.isEmpty) {
+      return null;
+    }
+    return DailyQuoteCacheEntry(date: date, payload: payload);
+  }
+
+  Future<void> saveDailyQuoteCache({
+    required String date,
+    required String payload,
+  }) async {
+    await _prefs.setString(AppPreferenceKeys.dailyQuoteCacheDate, date);
+    await _prefs.setString(AppPreferenceKeys.dailyQuoteCachePayload, payload);
   }
 
   Future<void> clear() {

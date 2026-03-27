@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/preferences/app_preferences.dart';
 
@@ -36,8 +35,13 @@ class DailyQuote {
 }
 
 class DailyQuoteService {
-  DailyQuoteService({http.Client? client}) : _client = client ?? http.Client();
+  DailyQuoteService({
+    required AppPreferencesRepository preferences,
+    http.Client? client,
+  })  : _preferences = preferences,
+        _client = client ?? http.Client();
 
+  final AppPreferencesRepository _preferences;
   final http.Client _client;
 
   static const _endpoint = 'https://open.iciba.com/dsapi';
@@ -89,17 +93,11 @@ class DailyQuoteService {
 
   Future<DailyQuote?> _readCache(String today) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final cacheDate = prefs.getString(AppPreferenceKeys.dailyQuoteCacheDate);
-      if (cacheDate != today) {
+      final cache = _preferences.readDailyQuoteCache();
+      if (cache == null || cache.date != today) {
         return null;
       }
-      final payload =
-          prefs.getString(AppPreferenceKeys.dailyQuoteCachePayload);
-      if (payload == null || payload.isEmpty) {
-        return null;
-      }
-      final decoded = jsonDecode(payload) as Map<String, dynamic>;
+      final decoded = jsonDecode(cache.payload) as Map<String, dynamic>;
       final quote = DailyQuote.fromJson(decoded);
       if (quote.english.isEmpty || quote.chinese.isEmpty) {
         return null;
@@ -112,7 +110,6 @@ class DailyQuoteService {
 
   Future<void> _writeCache(String today, DailyQuote quote) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
       final payload = jsonEncode({
         'content': quote.english,
         'note': quote.chinese,
@@ -120,8 +117,7 @@ class DailyQuoteService {
         'picture2': quote.imageUrl,
         'caption': quote.source,
       });
-      await prefs.setString(AppPreferenceKeys.dailyQuoteCacheDate, today);
-      await prefs.setString(AppPreferenceKeys.dailyQuoteCachePayload, payload);
+      await _preferences.saveDailyQuoteCache(date: today, payload: payload);
     } catch (_) {
       // Ignore cache write errors to avoid affecting the main flow.
     }
