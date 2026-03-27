@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/config/feature_flags.dart';
+import '../core/preferences/app_preferences.dart';
 import '../core/utils/date_utils.dart' as app_date;
 import '../core/utils/streak_calculator.dart';
 import '../features/habits/application/achievement_service.dart';
@@ -27,6 +28,11 @@ import '../features/settings/domain/health_reminder.dart';
 
 final themeColorIndexProvider = StateProvider<int>((ref) => 0);
 final isDarkModeProvider = StateProvider<bool>((ref) => false);
+final appPreferencesRepositoryProvider = Provider<AppPreferencesRepository>(
+  (ref) => throw UnimplementedError(
+    'appPreferencesRepositoryProvider must be overridden at app startup.',
+  ),
+);
 
 final habitRepositoryProvider = Provider((ref) => HabitRepository());
 final checkRecordRepositoryProvider =

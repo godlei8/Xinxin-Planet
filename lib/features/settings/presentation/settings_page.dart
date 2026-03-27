@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:permission_handler/permission_handler.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/config/feature_flags.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_notification_ids.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/database/database_helper.dart';
+import '../../../core/preferences/app_preferences.dart';
 import '../../../core/widgets/app_feedback.dart';
 import '../../../core/widgets/sanrio_background.dart';
 import '../../../features/habits/presentation/achievement_page.dart';
@@ -20,9 +21,9 @@ import '../../../services/backup_service.dart';
 import '../../../services/notification_service.dart';
 import '../../../services/providers.dart';
 
-final dailyReminderEnabledProvider = StateProvider<bool>((ref) => false);
-final dailyReminderTimeProvider =
-    StateProvider<TimeOfDay>((ref) => const TimeOfDay(hour: 21, minute: 0));
+final dailyReminderSettingsProvider = StateProvider<DailyReminderSettings>(
+  (ref) => DailyReminderSettings.defaults,
+);
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -34,6 +35,9 @@ class SettingsPage extends ConsumerStatefulWidget {
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   bool _busy = false;
 
+  AppPreferencesRepository get _preferences =>
+      ref.read(appPreferencesRepositoryProvider);
+
   @override
   void initState() {
     super.initState();
@@ -41,26 +45,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
     if (!mounted) {
       return;
     }
-    ref.read(dailyReminderEnabledProvider.notifier).state =
-        prefs.getBool('daily_reminder_enabled') ?? false;
-    ref.read(dailyReminderTimeProvider.notifier).state = TimeOfDay(
-      hour: prefs.getInt('daily_reminder_hour') ?? 21,
-      minute: prefs.getInt('daily_reminder_minute') ?? 0,
-    );
+    ref.read(dailyReminderSettingsProvider.notifier).state =
+        _preferences.dailyReminderSettings;
   }
 
-  Future<void> _saveReminderSettings(bool enabled, TimeOfDay time) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('daily_reminder_enabled', enabled);
-    await prefs.setInt('daily_reminder_hour', time.hour);
-    await prefs.setInt('daily_reminder_minute', time.minute);
+  Future<void> _saveReminderSettings(DailyReminderSettings settings) async {
+    await _preferences.saveDailyReminderSettings(settings);
 
-    if (!enabled) {
-      await NotificationService.cancelHabitReminder(9999);
+    if (!settings.enabled) {
+      await NotificationService.cancelHabitReminder(
+        AppNotificationIds.dailyReminder,
+      );
       if (!mounted) {
         return;
       }
@@ -69,11 +67,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
 
     await NotificationService.scheduleDailyReminder(
-      id: 9999,
+      id: AppNotificationIds.dailyReminder,
       title: '每日打卡提醒',
       body: '今天也给自己留一点坚持的时间。',
-      hour: time.hour,
-      minute: time.minute,
+      hour: settings.hour,
+      minute: settings.minute,
     );
 
     if (!mounted) {
@@ -81,7 +79,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
     showAppToast(
       context,
-      '提醒时间已更新为 ${time.format(context)}',
+      '提醒时间已更新为 ${_toTimeOfDay(settings).format(context)}',
       type: AppToastType.success,
     );
   }
@@ -98,12 +96,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     ref.invalidate(walletCoinsProvider);
   }
 
+  TimeOfDay _toTimeOfDay(DailyReminderSettings settings) {
+    return TimeOfDay(hour: settings.hour, minute: settings.minute);
+  }
+
   @override
   Widget build(BuildContext context) {
     final themeColorIndex = ref.watch(themeColorIndexProvider);
     final isDarkMode = ref.watch(isDarkModeProvider);
-    final dailyReminderEnabled = ref.watch(dailyReminderEnabledProvider);
-    final dailyReminderTime = ref.watch(dailyReminderTimeProvider);
+    final dailyReminderSettings = ref.watch(dailyReminderSettingsProvider);
+    final dailyReminderEnabled = dailyReminderSettings.enabled;
+    final dailyReminderTime = _toTimeOfDay(dailyReminderSettings);
     final achievementsAsync = ref.watch(achievementsProvider);
     final healthRemindersAsync = ref.watch(healthRemindersProvider);
 
@@ -276,19 +279,19 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       trailing: Switch.adaptive(
                         value: dailyReminderEnabled,
                         onChanged: (value) async {
-                          ref
-                              .read(dailyReminderEnabledProvider.notifier)
-                              .state = value;
+                          final updatedSettings = dailyReminderSettings.copyWith(
+                            enabled: value,
+                          );
+                          ref.read(dailyReminderSettingsProvider.notifier).state =
+                              updatedSettings;
                           try {
-                            await _saveReminderSettings(
-                                value, dailyReminderTime);
+                            await _saveReminderSettings(updatedSettings);
                           } catch (error) {
                             if (!context.mounted) {
                               return;
                             }
-                            ref
-                                .read(dailyReminderEnabledProvider.notifier)
-                                .state = false;
+                            ref.read(dailyReminderSettingsProvider.notifier).state =
+                                dailyReminderSettings;
                             showAppToast(
                               context,
                               '提醒设置失败：$error',
@@ -418,8 +421,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Future<void> _saveThemeColor(int index) async {
     ref.read(themeColorIndexProvider.notifier).state = index;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('theme_color_index', index);
+    await _preferences.saveThemeColorIndex(index);
     if (!mounted) {
       return;
     }
@@ -428,8 +430,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Future<void> _saveDarkMode(bool value) async {
     ref.read(isDarkModeProvider.notifier).state = value;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('dark_mode', value);
+    await _preferences.saveIsDarkMode(value);
   }
 
   void _openAchievementPage() {
@@ -473,13 +474,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       return;
     }
 
-    ref.read(dailyReminderTimeProvider.notifier).state = newTime;
+    final currentSettings = ref.read(dailyReminderSettingsProvider);
+    final updatedSettings = currentSettings.copyWith(
+      enabled: true,
+      hour: newTime.hour,
+      minute: newTime.minute,
+    );
+    ref.read(dailyReminderSettingsProvider.notifier).state = updatedSettings;
     try {
-      await _saveReminderSettings(true, newTime);
+      await _saveReminderSettings(updatedSettings);
     } catch (error) {
       if (!mounted) {
         return;
       }
+      ref.read(dailyReminderSettingsProvider.notifier).state = currentSettings;
       showAppToast(context, '修改提醒时间失败：$error', type: AppToastType.error);
     }
   }
@@ -766,15 +774,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     setState(() => _busy = true);
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.clear();
+      await _preferences.clear();
       await DatabaseHelper.clearAllData();
       await NotificationService.cancelAllReminders();
       ref.read(themeColorIndexProvider.notifier).state = 0;
       ref.read(isDarkModeProvider.notifier).state = false;
-      ref.read(dailyReminderEnabledProvider.notifier).state = false;
-      ref.read(dailyReminderTimeProvider.notifier).state =
-          const TimeOfDay(hour: 21, minute: 0);
+      ref.read(dailyReminderSettingsProvider.notifier).state =
+          DailyReminderSettings.defaults;
       await _reloadData();
       if (!mounted) {
         return;

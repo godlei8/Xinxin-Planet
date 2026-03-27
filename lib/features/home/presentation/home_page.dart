@@ -7,6 +7,7 @@ import '../../../core/constants/app_strings.dart';
 import '../../../core/utils/date_utils.dart' as app_date;
 import '../../../core/widgets/sanrio_background.dart';
 import '../../../services/providers.dart';
+import '../application/home_overview.dart';
 import '../../habits/domain/habit.dart';
 import '../../habits/presentation/add_edit_habit_page.dart';
 import '../data/daily_quote_service.dart';
@@ -19,9 +20,9 @@ class HomePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final overviewAsync = ref.watch(homeOverviewProvider);
     final habitsAsync = ref.watch(habitsProvider);
     final recordsAsync = ref.watch(checkRecordsProvider);
-    final progressAsync = ref.watch(userProgressProvider);
     final quoteAsync = ref.watch(dailyQuoteProvider);
     final suggestionsAsync = ref.watch(habitSuggestionsProvider);
     final coinsAsync = ref.watch(walletCoinsProvider);
@@ -37,22 +38,14 @@ class HomePage extends ConsumerWidget {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 124),
             children: [
-              progressAsync.when(
-                data: (progress) => recordsAsync.when(
-                  data: (records) => habitsAsync.when(
-                    data: (habits) => _HeroCard(
-                      progress: progress,
-                      completedCount: records.length,
-                      totalCount: habits.length,
+              overviewAsync.when(
+                data: (overview) => _HeroCard(
+                      progress: overview.progress,
+                      completedCount: overview.completedCount,
+                      totalCount: overview.totalCount,
                       quoteAsync: quoteAsync,
                       coinsAsync: coinsAsync,
                     ),
-                    loading: () => const SizedBox.shrink(),
-                    error: (_, __) => const SizedBox.shrink(),
-                  ),
-                  loading: () => const SizedBox.shrink(),
-                  error: (_, __) => const SizedBox.shrink(),
-                ),
                 loading: () => const SizedBox(
                   height: 300,
                   child: Center(child: CircularProgressIndicator()),

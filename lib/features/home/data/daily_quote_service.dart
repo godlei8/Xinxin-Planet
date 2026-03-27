@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/preferences/app_preferences.dart';
+
 class DailyQuote {
   const DailyQuote({
     required this.english,
@@ -39,8 +41,6 @@ class DailyQuoteService {
   final http.Client _client;
 
   static const _endpoint = 'https://open.iciba.com/dsapi';
-  static const _cacheDateKey = 'daily_quote_cache_date';
-  static const _cachePayloadKey = 'daily_quote_cache_payload';
 
   static const _fallbackQuote = DailyQuote(
     english: 'Tiny progress still counts today.',
@@ -90,11 +90,12 @@ class DailyQuoteService {
   Future<DailyQuote?> _readCache(String today) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final cacheDate = prefs.getString(_cacheDateKey);
+      final cacheDate = prefs.getString(AppPreferenceKeys.dailyQuoteCacheDate);
       if (cacheDate != today) {
         return null;
       }
-      final payload = prefs.getString(_cachePayloadKey);
+      final payload =
+          prefs.getString(AppPreferenceKeys.dailyQuoteCachePayload);
       if (payload == null || payload.isEmpty) {
         return null;
       }
@@ -119,8 +120,8 @@ class DailyQuoteService {
         'picture2': quote.imageUrl,
         'caption': quote.source,
       });
-      await prefs.setString(_cacheDateKey, today);
-      await prefs.setString(_cachePayloadKey, payload);
+      await prefs.setString(AppPreferenceKeys.dailyQuoteCacheDate, today);
+      await prefs.setString(AppPreferenceKeys.dailyQuoteCachePayload, payload);
     } catch (_) {
       // Ignore cache write errors to avoid affecting the main flow.
     }

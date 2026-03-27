@@ -22,6 +22,36 @@ class DatabaseHelper {
     'sleep_sessions',
   ];
 
+  static const List<String> _clearOrder = [
+    'check_records',
+    'habits',
+    'categories',
+    'achievements',
+    'user_progress',
+    'focus_forest',
+    'health_reminders',
+    'user_wallet',
+    'user_inventory',
+    'supervision_logs',
+    'supervision_partners',
+    'sleep_sessions',
+  ];
+
+  static const List<String> _restoreOrder = [
+    'categories',
+    'habits',
+    'check_records',
+    'achievements',
+    'user_progress',
+    'focus_forest',
+    'health_reminders',
+    'user_wallet',
+    'user_inventory',
+    'supervision_partners',
+    'supervision_logs',
+    'sleep_sessions',
+  ];
+
   static Database? _database;
 
   static Future<Database> get database async {
@@ -200,11 +230,7 @@ class DatabaseHelper {
     ''');
 
     await _ensureIndexes(db);
-    await _insertDefaultCategories(db);
-    await _insertDefaultAchievements(db);
-    await _insertDefaultUserProgress(db);
-    await _insertDefaultHealthReminders(db);
-    await _insertDefaultWallet(db);
+    await _seedDefaultData(db);
   }
 
   static Future<void> _ensureIndexes(DatabaseExecutor db) async {
@@ -433,71 +459,17 @@ class DatabaseHelper {
     final db = await database;
 
     await db.transaction((txn) async {
-      await txn.delete('check_records');
-      await txn.delete('habits');
-      await txn.delete('categories');
-      await txn.delete('achievements');
-      await txn.delete('user_progress');
-      await txn.delete('focus_forest');
-      await txn.delete('health_reminders');
-      await txn.delete('user_wallet');
-      await txn.delete('user_inventory');
-      await txn.delete('supervision_logs');
-      await txn.delete('supervision_partners');
-      await txn.delete('sleep_sessions');
-
-      await _restoreTable(txn, 'categories', data['categories']);
-      await _restoreTable(txn, 'habits', data['habits']);
-      await _restoreTable(txn, 'check_records', data['check_records']);
-      await _restoreTable(txn, 'achievements', data['achievements']);
-      await _restoreTable(txn, 'user_progress', data['user_progress']);
-      await _restoreTable(txn, 'focus_forest', data['focus_forest']);
-      await _restoreTable(txn, 'health_reminders', data['health_reminders']);
-      await _restoreTable(txn, 'user_wallet', data['user_wallet']);
-      await _restoreTable(txn, 'user_inventory', data['user_inventory']);
-      await _restoreTable(
-          txn, 'supervision_partners', data['supervision_partners']);
-      await _restoreTable(txn, 'supervision_logs', data['supervision_logs']);
-      await _restoreTable(txn, 'sleep_sessions', data['sleep_sessions']);
-
-      if (await _isTableEmpty(txn, 'categories')) {
-        await _insertDefaultCategories(txn);
-      }
-      if (await _isTableEmpty(txn, 'achievements')) {
-        await _insertDefaultAchievements(txn);
-      }
-      if (await _isTableEmpty(txn, 'user_progress')) {
-        await _insertDefaultUserProgress(txn);
-      }
-      if (await _isTableEmpty(txn, 'health_reminders')) {
-        await _insertDefaultHealthReminders(txn);
-      }
-      if (await _isTableEmpty(txn, 'user_wallet')) {
-        await _insertDefaultWallet(txn);
-      }
+      await _clearTransactionalData(txn);
+      await _restoreImportedData(txn, data);
+      await _ensureRequiredSeedData(txn);
     });
   }
 
   static Future<void> clearAllData() async {
     final db = await database;
     await db.transaction((txn) async {
-      await txn.delete('check_records');
-      await txn.delete('habits');
-      await txn.delete('categories');
-      await txn.delete('achievements');
-      await txn.delete('user_progress');
-      await txn.delete('focus_forest');
-      await txn.delete('health_reminders');
-      await txn.delete('user_wallet');
-      await txn.delete('user_inventory');
-      await txn.delete('supervision_logs');
-      await txn.delete('supervision_partners');
-      await txn.delete('sleep_sessions');
-      await _insertDefaultCategories(txn);
-      await _insertDefaultAchievements(txn);
-      await _insertDefaultUserProgress(txn);
-      await _insertDefaultHealthReminders(txn);
-      await _insertDefaultWallet(txn);
+      await _clearTransactionalData(txn);
+      await _seedDefaultData(txn);
     });
   }
 
@@ -526,15 +498,38 @@ class DatabaseHelper {
     return Sqflite.firstIntValue(result) == 0;
   }
 
-  static Future<void> _onUpgrade(
-    Database db,
-    int oldVersion,
-    int newVersion,
+  static Future<void> _clearTransactionalData(DatabaseExecutor db) async {
+    for (final table in _clearOrder) {
+      await db.delete(table);
+    }
+  }
+
+  static Future<void> _restoreImportedData(
+    DatabaseExecutor db,
+    Map<String, dynamic> data,
   ) async {
-    await MigrationHelper.upgradeDatabase(db, oldVersion, newVersion);
-    await _ensureIndexes(db);
+    for (final table in _restoreOrder) {
+      await _restoreTable(db, table, data[table]);
+    }
+  }
+
+  static Future<void> _seedDefaultData(DatabaseExecutor db) async {
+    await _insertDefaultCategories(db);
+    await _insertDefaultAchievements(db);
+    await _insertDefaultUserProgress(db);
+    await _insertDefaultHealthReminders(db);
+    await _insertDefaultWallet(db);
+  }
+
+  static Future<void> _ensureRequiredSeedData(DatabaseExecutor db) async {
+    if (await _isTableEmpty(db, 'categories')) {
+      await _insertDefaultCategories(db);
+    }
     if (await _isTableEmpty(db, 'achievements')) {
       await _insertDefaultAchievements(db);
+    }
+    if (await _isTableEmpty(db, 'user_progress')) {
+      await _insertDefaultUserProgress(db);
     }
     if (await _isTableEmpty(db, 'health_reminders')) {
       await _insertDefaultHealthReminders(db);
@@ -542,6 +537,16 @@ class DatabaseHelper {
     if (await _isTableEmpty(db, 'user_wallet')) {
       await _insertDefaultWallet(db);
     }
+  }
+
+  static Future<void> _onUpgrade(
+    Database db,
+    int oldVersion,
+    int newVersion,
+  ) async {
+    await MigrationHelper.upgradeDatabase(db, oldVersion, newVersion);
+    await _ensureIndexes(db);
+    await _ensureRequiredSeedData(db);
   }
 
   static Future<void> close() async {
